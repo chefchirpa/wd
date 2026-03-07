@@ -6,6 +6,7 @@
 
 #include "Fidele.h"
 #include "Domaine.h"
+#include "Board.h"
 
 FideleType parseType(const std::string& typeStr) {
     if (typeStr == "Héros") return FideleType::Heros;
@@ -82,6 +83,70 @@ int main() {
                   << ", Left: " << mov.left
                   << ", Right: " << mov.right << ")" << std::endl;
     }
+
+    std::cout << "\n--- Testing Board Logic ---\n";
+    Board board;
+
+    if (fideles.empty()) {
+        std::cerr << "No fideles loaded to test the board." << std::endl;
+        return 1;
+    }
+
+    // Give the first Fidele to Player 1 and place it on the board
+    Fidele& myCyclope = fideles[0];
+    myCyclope.setOwner(Player::Player1);
+
+    Position startPos = {2, 4};
+    board.placeFidele(&myCyclope, startPos);
+    std::cout << "Placed " << myCyclope.getName() << " at (" << startPos.x << "," << startPos.y << ")\n";
+
+    // Test a valid move: 2 squares forward, 1 right (Cyclope has 3 Forward, 2 Right)
+    // Note: Player 1 moves "forward" in the +x direction
+    std::vector<Position> validPath = {
+        {3, 4}, // Forward 1
+        {4, 4}, // Forward 2
+        {4, 5}  // Right 1
+    };
+
+    if (board.moveFidele(&myCyclope, validPath)) {
+        std::cout << "Valid move successful! New position: ("
+                  << myCyclope.getPosition().x << "," << myCyclope.getPosition().y << ")\n";
+    } else {
+        std::cout << "Valid move failed.\n";
+    }
+
+    // Test an invalid move: moving diagonally
+    std::vector<Position> invalidPath = {
+        {5, 6} // Diagonal move from {4,5}
+    };
+
+    if (board.moveFidele(&myCyclope, invalidPath)) {
+        std::cout << "Invalid move succeeded (Error!).\n";
+    } else {
+        std::cout << "Invalid move rejected successfully (No diagonals).\n";
+    }
+
+    // Test killing and resurrecting
+    std::cout << "\nKilling " << myCyclope.getName() << "...\n";
+    board.killFidele(&myCyclope);
+
+    if (!myCyclope.isAlive()) {
+        std::cout << myCyclope.getName() << " is dead. Death position recorded at ("
+                  << myCyclope.getDeathPosition().x << "," << myCyclope.getDeathPosition().y << ")\n";
+    }
+
+    std::cout << "Resurrecting " << myCyclope.getName() << "...\n";
+    board.resurrectFidele(&myCyclope);
+
+    if (myCyclope.isAlive() && myCyclope.getPosition() == myCyclope.getDeathPosition()) {
+        std::cout << myCyclope.getName() << " resurrected successfully at ("
+                  << myCyclope.getPosition().x << "," << myCyclope.getPosition().y << ")\n";
+    } else {
+        std::cout << "Resurrection failed.\n";
+    }
+
+    std::cout << "\nFinal Board State:\n";
+    board.printBoard();
 
     return 0;
 }

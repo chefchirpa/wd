@@ -4,4 +4,4 @@ project(WarDolls)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-add_executable(WarDolls main.cpp)
+add_executable(WarDolls main.cpp Board.cpp)
