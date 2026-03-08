@@ -12,14 +12,12 @@
 #include "Domaine.h"
 #include "Board.h"
 
-// Define the static Language variable from Fidele
-Language Fidele::currentLanguage = Language::English;
+#include "God.h"
+#include "GodPowerManager.h"
 
-struct PlayerState {
-    std::deque<Fidele*> deck;
-    std::vector<Fidele*> hand;
-    Player playerId;
-};
+// Define the static Language variable from Fidele and God
+Language Fidele::currentLanguage = Language::English;
+Language God::currentLanguage = Language::English;
 
 // Callback function for libcurl to write received data into a std::string
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
@@ -108,7 +106,13 @@ std::vector<std::string> parseCSVLine(const std::string& line) {
     return result;
 }
 
-void setupGame(std::vector<Fidele>& allFideles, PlayerState& p1, PlayerState& p2) {
+PowerType parsePowerType(const std::string& typeStr) {
+    if (typeStr == "Green" || typeStr == "Vert") return PowerType::Green;
+    if (typeStr == "Red" || typeStr == "Rouge") return PowerType::Red;
+    return PowerType::Unknown;
+}
+
+void setupGame(std::vector<Fidele>& allFideles, std::vector<God>& allGods, PlayerState& p1, PlayerState& p2) {
     p1.playerId = Player::Player1;
     p2.playerId = Player::Player2;
 
@@ -145,6 +149,22 @@ void setupGame(std::vector<Fidele>& allFideles, PlayerState& p1, PlayerState& p2
             p2.hand.push_back(p2.deck.front());
             p2.deck.pop_front();
         }
+    }
+
+    // Allocate 3 God cards to each player based on their faction
+    std::vector<God*> greekGods;
+    std::vector<God*> romanGods;
+    for (auto& g : allGods) {
+        if (g.getFaction() == Faction::Greek) greekGods.push_back(&g);
+        else if (g.getFaction() == Faction::Roman) romanGods.push_back(&g);
+    }
+
+    std::shuffle(std::begin(greekGods), std::end(greekGods), rng);
+    std::shuffle(std::begin(romanGods), std::end(romanGods), rng);
+
+    for (int i = 0; i < 3; ++i) {
+        if (i < greekGods.size()) p1.gods.push_back(greekGods[i]);
+        if (i < romanGods.size()) p2.gods.push_back(romanGods[i]);
     }
 }
 
@@ -357,8 +377,63 @@ int main() {
 
     std::cout << "Loaded " << fideles.size() << " fideles." << std::endl;
 
+    // --- Load Gods CSV ---
+    std::vector<God> gods;
+    std::string godsUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTcCb5RRtnClh6-InKLA8U9ppoosYrBBIWi-xjrs7vK8FG0mUm4XLIRAc0OJNlOo1fQ84lZA9BM3mU0/pub?gid=1509377759&single=true&output=csv";
+    std::cout << "Fetching Gods data from Google Sheets..." << std::endl;
+    std::string godsCsvData = downloadCSV(godsUrl);
+
+    if (godsCsvData.empty() || godsCsvData.find("<html") != std::string::npos) {
+        std::cerr << "Failed to fetch Gods CSV data or URL is broken. Falling back to hardcoded mock data for testing." << std::endl;
+        gods.push_back(God("Zeus", "Zeus", "Lightning", "Éclairs", "Sends a shower of lightning and inflicts 5 points of damage.", "Envoie une pluie d'éclairs et inflige 5 points de dégâts.", Faction::Greek, PowerType::Red));
+        gods.push_back(God("Hades", "Hadès", "Recall", "Rappel", "Resurrects a unit.", "Ressuscite une unité.", Faction::Greek, PowerType::Red));
+    } else {
+        std::stringstream gss(godsCsvData);
+        std::string gline;
+        std::getline(gss, gline); // Skip header
+
+        while (std::getline(gss, gline)) {
+            if (gline.empty() || gline == "\r") continue;
+
+            std::vector<std::string> cols = parseCSVLine(gline);
+            // Expected columns from Google Sheets (Gods tab):
+            // 0: ID
+            // 1: Faction
+            // 2: Name En
+            // 3: Ability En
+            // 4: Desc En
+            // 5: Name Fr
+            // 6: Ability Fr
+            // 7: Desc Fr
+            // 8: Image
+            // 9: Type (Green/Red)
+
+            if (cols.size() < 10) {
+                std::cerr << "Skipping malformed God line: " << gline << std::endl;
+                continue;
+            }
+
+            try {
+                Faction faction = parseFaction(cols[1]);
+                std::string nameEn = cols[2];
+                std::string abilityEn = cols[3];
+                std::string descEn = cols[4];
+                std::string nameFr = cols[5];
+                std::string abilityFr = cols[6];
+                std::string descFr = cols[7];
+                PowerType pType = parsePowerType(cols[9]);
+
+                gods.push_back(God(nameEn, nameFr, abilityEn, abilityFr, descEn, descFr, faction, pType));
+            } catch (const std::exception& e) {
+                std::cerr << "Error parsing God line: " << gline << " - " << e.what() << std::endl;
+            }
+        }
+    }
+    std::cout << "Loaded " << gods.size() << " gods." << std::endl;
+
     // Toggling language to show both
     Fidele::currentLanguage = Language::English;
+    God::currentLanguage = Language::English;
     std::cout << "\n[English Language Set]\n";
     for (const auto& fidele : fideles) {
         std::cout << "Fidele: " << fidele.getName() << " | Ability: " << fidele.getAbility() << "\n";
@@ -417,6 +492,49 @@ int main() {
         std::cout << "-> Achille moved successfully to (" << achillePtr->getPosition().x << "," << achillePtr->getPosition().y << ")!\n";
     }
 
+    // --- Testing PLAY_GOD command ---
+    std::cout << "\n--- Testing PLAY_GOD command ---\n";
+
+    // We will simulate P1 (Greek) playing Zeus on Cyclope
+    God* zeusPtr = nullptr;
+    for (auto& g : gods) {
+        // Find by name in either language
+        if (g.getName() == "Zeus" || g.getName() == "Zeus (FR)") zeusPtr = &g;
+    }
+
+    // Since currentLanguage is French by the time we get here, the name might be 'Zeus' depending on the sheet. Let's just search Ability "Eclairs" to be safe.
+    if (!zeusPtr) {
+        for (auto& g : gods) {
+            if (g.getAbility() == "Eclairs" || g.getAbility() == "Lightning") zeusPtr = &g;
+        }
+    }
+
+    if (zeusPtr) {
+        // We need a dummy player state for this quick test before the main loop resets things
+        PlayerState dummyP1;
+        dummyP1.playerId = Player::Player1;
+        dummyP1.gods.push_back(zeusPtr);
+
+        std::string command = "PLAY_GOD Zeus Cyclope";
+        std::cout << "Command received: " << command << "\n";
+
+        if (command.rfind("PLAY_GOD ", 0) == 0) {
+            std::string args = command.substr(9);
+            size_t spacePos = args.find(' ');
+            if (spacePos != std::string::npos) {
+                std::string godName = args.substr(0, spacePos);
+                std::string targetName = args.substr(spacePos + 1);
+
+                GodPowerManager::playGod(zeusPtr, dummyP1, board, Player::Player1, targetName, fideles);
+            }
+        }
+    } else {
+        std::cout << "Zeus God card not found in CSV.\n";
+    }
+
+    std::cout << "\n[Board State After God Card]\n";
+    board.displayBoard();
+
     // --- FULL GAME LOOP ---
     std::cout << "\n--- Setting up standard game loop ---\n";
     board = Board(); // Reset board to clean state
@@ -429,7 +547,7 @@ int main() {
     }
 
     PlayerState player1, player2;
-    setupGame(fideles, player1, player2);
+    setupGame(fideles, gods, player1, player2);
     GameState state = { &player1, &player2 };
 
     std::cout << "Game setup complete.\n";

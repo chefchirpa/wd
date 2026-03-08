@@ -28,3 +28,17 @@ struct Position {
         return !(*this == other);
     }
 };
+
+#include <vector>
+#include <deque>
+
+// Forward declarations to allow struct PlayerState to compile cleanly
+class Fidele;
+class God;
+
+struct PlayerState {
+    std::deque<Fidele*> deck;
+    std::vector<Fidele*> hand;
+    std::vector<God*> gods;
+    Player playerId;
+};

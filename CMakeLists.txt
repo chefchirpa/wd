@@ -6,5 +6,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(CURL REQUIRED)
 
-add_executable(WarDolls main.cpp Board.cpp)
+add_executable(WarDolls main.cpp Board.cpp GodPowerManager.cpp)
 target_link_libraries(WarDolls CURL::libcurl)
