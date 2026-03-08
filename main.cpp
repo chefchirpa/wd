@@ -14,6 +14,7 @@
 
 #include "God.h"
 #include "GodPowerManager.h"
+#include "DeckBuilder.h"
 
 // Define the static Language variable from Fidele and God
 Language Fidele::currentLanguage = Language::English;
@@ -302,17 +303,35 @@ void printStateOfTheWar(const GameState& state, Board& board, const std::vector<
     std::cout << "===========================================\n\n";
 }
 
-int main() {
-    std::cout << "===========================================\n";
-    std::cout << "          W A R   D O L L S                \n";
-    std::cout << "===========================================\n";
-    std::cout << "Choisissez votre langue / Choose your language (FR/EN) : \n";
+int main(int argc, char* argv[]) {
+    bool launchBuilder = false;
+    Faction builderFaction = Faction::None;
 
-    // In a real environment, we would use std::cin. For automated testing, we hardcode to French as requested.
-    std::string langChoice = "FR"; // Hardcoded for test. Simulate: std::cin >> langChoice;
+    if (argc >= 3 && std::string(argv[1]) == "--build-deck") {
+        launchBuilder = true;
+        if (std::string(argv[2]) == "Greek") builderFaction = Faction::Greek;
+        else if (std::string(argv[2]) == "Roman") builderFaction = Faction::Roman;
+    }
+
+    if (!launchBuilder) {
+        std::cout << "===========================================\n";
+        std::cout << "          W A R   D O L L S                \n";
+        std::cout << "===========================================\n";
+        std::cout << "Choisissez votre langue / Choose your language (FR/EN) : \n";
+    }
+
+    std::string langChoice;
+    if (launchBuilder) {
+        // Just default to EN for builder to avoid blocking automated tests without an interactive tty wrapper
+        langChoice = "EN";
+    } else {
+        // Fallback for automated tests that don't have interactive stdin
+        langChoice = "FR";
+        std::cout << "> " << langChoice << " (Auto-selected for test)\n\n";
+    }
 
     if (langChoice == "FR") {
-        std::cout << "> Langue choisie : Français\n\n";
+        std::cout << "Langue choisie : Français\n\n";
         Fidele::currentLanguage = Language::French;
         God::currentLanguage = Language::French;
     } else {
@@ -476,20 +495,9 @@ int main() {
     }
     std::cout << "Loaded " << gods.size() << " gods." << std::endl;
 
-    // Toggling language to show both
-    Fidele::currentLanguage = Language::English;
-    God::currentLanguage = Language::English;
-    std::cout << "\n[English Language Set]\n";
-    for (const auto& fidele : fideles) {
-        std::cout << "Fidele: " << fidele.getName() << " | Ability: " << fidele.getAbility() << "\n";
-        std::cout << "  Desc: " << fidele.getDescription() << "\n";
-    }
-
-    Fidele::currentLanguage = Language::French;
-    std::cout << "\n[French Language Set]\n";
-    for (const auto& fidele : fideles) {
-        std::cout << "Fidèle: " << fidele.getName() << " | Pouvoir: " << fidele.getAbility() << "\n";
-        std::cout << "  Desc: " << fidele.getDescription() << "\n";
+    if (launchBuilder) {
+        DeckBuilder::launchInteractiveBuilder(fideles, gods, builderFaction);
+        return 0;
     }
 
     // --- Visual Simulation Demo ---
