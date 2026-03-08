@@ -379,7 +379,7 @@ int main() {
 
     // --- Load Gods CSV ---
     std::vector<God> gods;
-    std::string godsUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTcCb5RRtnClh6-InKLA8U9ppoosYrBBIWi-xjrs7vK8FG0mUm4XLIRAc0OJNlOo1fQ84lZA9BM3mU0/pub?gid=1509377759&single=true&output=csv";
+    std::string godsUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTcCb5RRtnClh6-InKLA8U9ppoosYrBBIWi-xjrs7vK8FG0mUm4XLIRAc0OJNlOo1fQ84lZA9BM3mU0/pub?gid=1190568154&single=true&output=csv";
     std::cout << "Fetching Gods data from Google Sheets..." << std::endl;
     std::string godsCsvData = downloadCSV(godsUrl);
 
@@ -396,32 +396,30 @@ int main() {
             if (gline.empty() || gline == "\r") continue;
 
             std::vector<std::string> cols = parseCSVLine(gline);
-            // Expected columns from Google Sheets (Gods tab):
-            // 0: ID
-            // 1: Faction
-            // 2: Name En
-            // 3: Ability En
-            // 4: Desc En
-            // 5: Name Fr
-            // 6: Ability Fr
-            // 7: Desc Fr
-            // 8: Image
-            // 9: Type (Green/Red)
+            // Expected columns from the new Google Sheets link:
+            // 0: Name
+            // 1: Name FR
+            // 2: Faction
+            // 3: Power_Type
+            // 4: Ability
+            // 5: Ability FR
+            // 6: Description
+            // 7: Description FR
 
-            if (cols.size() < 10) {
+            if (cols.size() < 8) {
                 std::cerr << "Skipping malformed God line: " << gline << std::endl;
                 continue;
             }
 
             try {
-                Faction faction = parseFaction(cols[1]);
-                std::string nameEn = cols[2];
-                std::string abilityEn = cols[3];
-                std::string descEn = cols[4];
-                std::string nameFr = cols[5];
-                std::string abilityFr = cols[6];
+                std::string nameEn = cols[0];
+                std::string nameFr = cols[1];
+                Faction faction = parseFaction(cols[2]);
+                PowerType pType = parsePowerType(cols[3]);
+                std::string abilityEn = cols[4];
+                std::string abilityFr = cols[5];
+                std::string descEn = cols[6];
                 std::string descFr = cols[7];
-                PowerType pType = parsePowerType(cols[9]);
 
                 gods.push_back(God(nameEn, nameFr, abilityEn, abilityFr, descEn, descFr, faction, pType));
             } catch (const std::exception& e) {
