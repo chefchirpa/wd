@@ -18,11 +18,22 @@ struct Movement {
 
 class Fidele {
 public:
-    Fidele(const std::string& name, FideleType type, int hp, int range, Movement movement, Player owner = Player::None)
-        : name(name), type(type), hp(hp), currentHp(hp), range(range), movement(movement), owner(owner),
+    static Language currentLanguage;
+
+    Fidele(const std::string& nameEn, const std::string& nameFr,
+           const std::string& abilityEn, const std::string& abilityFr,
+           const std::string& descEn, const std::string& descFr,
+           Faction faction, FideleType type, int hp, int range, Movement movement, Player owner = Player::None)
+        : nameEn(nameEn), nameFr(nameFr), abilityEn(abilityEn), abilityFr(abilityFr),
+          descEn(descEn), descFr(descFr), faction(faction), type(type),
+          hp(hp), currentHp(hp), range(range), movement(movement), owner(owner),
           alive(true), currentPosition{-1, -1}, deathPosition{-1, -1} {}
 
-    std::string getName() const { return name; }
+    std::string getName() const { return currentLanguage == Language::English ? nameEn : nameFr; }
+    std::string getAbility() const { return currentLanguage == Language::English ? abilityEn : abilityFr; }
+    std::string getDescription() const { return currentLanguage == Language::English ? descEn : descFr; }
+
+    Faction getFaction() const { return faction; }
     FideleType getType() const { return type; }
     int getHP() const { return hp; }
     int getCurrentHP() const { return currentHp; }
@@ -65,7 +76,14 @@ public:
     void setDeathPosition(Position pos) { deathPosition = pos; }
 
 private:
-    std::string name;
+    std::string nameEn;
+    std::string nameFr;
+    std::string abilityEn;
+    std::string abilityFr;
+    std::string descEn;
+    std::string descFr;
+
+    Faction faction;
     FideleType type;
     int hp;
     int currentHp;

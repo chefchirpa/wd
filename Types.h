@@ -6,6 +6,17 @@ enum class Player {
     None
 };
 
+enum class Language {
+    English,
+    French
+};
+
+enum class Faction {
+    Greek,
+    Roman,
+    None
+};
+
 struct Position {
     int x;
     int y;

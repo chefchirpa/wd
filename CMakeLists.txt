@@ -4,4 +4,7 @@ project(WarDolls)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+find_package(CURL REQUIRED)
+
 add_executable(WarDolls main.cpp Board.cpp)
+target_link_libraries(WarDolls CURL::libcurl)
