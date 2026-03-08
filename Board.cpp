@@ -1,8 +1,11 @@
 #include "Board.h"
 #include <iostream>
 #include <cmath>
+#include <cstdlib> // For rand
+#include <ctime>   // For time
 
-Board::Board() {
+Board::Board() : domaine1(Player::Player1), domaine2(Player::Player2) {
+    std::srand(std::time(nullptr)); // Initialize random seed
     for (int i = 0; i < LENGTH; ++i) {
         for (int j = 0; j < WIDTH; ++j) {
             grid[i][j] = nullptr;
@@ -121,6 +124,102 @@ bool Board::isValidMove(Fidele* fidele, const std::vector<Position>& path) const
     }
 
     return true;
+}
+
+Domaine* Board::getDomaine(Player player) {
+    if (player == Player::Player1) return &domaine1;
+    if (player == Player::Player2) return &domaine2;
+    return nullptr;
+}
+
+int Board::rollDice() const {
+    return (std::rand() % 6) + 1;
+}
+
+bool Board::isInRange(Position p1, Position p2, int range) const {
+    // Combat rules state attacks must be on the same row OR column (no diagonals)
+    if (p1.x == p2.x) {
+        return std::abs(p1.y - p2.y) <= range;
+    } else if (p1.y == p2.y) {
+        return std::abs(p1.x - p2.x) <= range;
+    }
+    return false;
+}
+
+void Board::attackFidele(Fidele* attacker, Fidele* defender) {
+    if (!attacker || !defender || !attacker->isAlive() || !defender->isAlive()) return;
+    if (attacker->getOwner() == defender->getOwner()) return; // Can't attack own
+
+    if (!isInRange(attacker->getPosition(), defender->getPosition(), attacker->getRange())) {
+        std::cout << "Attack failed: " << defender->getName() << " is out of range." << std::endl;
+        return;
+    }
+
+    int attackRoll = rollDice();
+    int defenseRoll = rollDice();
+
+    int totalAttack = attackRoll + attacker->getAttackBonus();
+    int totalDefense = defenseRoll + defender->getDefenseBonus();
+
+    std::cout << attacker->getName() << " attacks! Roll: " << attackRoll << " + Bonus: " << attacker->getAttackBonus() << " = " << totalAttack << std::endl;
+    std::cout << defender->getName() << " defends! Roll: " << defenseRoll << " + Bonus: " << defender->getDefenseBonus() << " = " << totalDefense << std::endl;
+
+    int damage = totalAttack - totalDefense;
+    if (damage < 0) damage = 0; // "points d’attaque ou de défense finaux ne peuvent pas être inférieurs à 0" and difference can't be negative damage
+
+    std::cout << "Damage dealt: " << damage << std::endl;
+
+    if (damage > 0) {
+        defender->takeDamage(damage);
+        if (defender->getCurrentHP() <= 0) {
+            std::cout << defender->getName() << " has been slain!" << std::endl;
+            killFidele(defender);
+
+            // "chaque fidèle qui périt fait perdre 1 point de vie au domaine des Dieux."
+            Domaine* defenderDomaine = getDomaine(defender->getOwner());
+            if (defenderDomaine) {
+                defenderDomaine->takeDamage(1);
+                std::cout << "Domain of Player " << (defender->getOwner() == Player::Player1 ? "1" : "2")
+                          << " loses 1 HP. Current HP: " << defenderDomaine->getHP() << std::endl;
+            }
+        } else {
+            std::cout << defender->getName() << " survives with " << defender->getCurrentHP() << " HP left." << std::endl;
+        }
+    }
+}
+
+void Board::attackDomaine(Fidele* attacker, Domaine* targetDomaine) {
+    if (!attacker || !attacker->isAlive() || !targetDomaine) return;
+    if (attacker->getOwner() == targetDomaine->getOwner()) return; // Can't attack own domain
+
+    // Domain range check
+    // Domain 1 is adjacent to x=0, Domain 2 is adjacent to x=LENGTH-1
+    bool inRange = false;
+    Position p = attacker->getPosition();
+    int r = attacker->getRange();
+
+    if (targetDomaine->getOwner() == Player::Player1) {
+        // Domain 1 is at x < 0. Distance is simply attacker's x coordinate + 1
+        if ((p.x + 1) <= r) inRange = true;
+    } else if (targetDomaine->getOwner() == Player::Player2) {
+        // Domain 2 is at x >= LENGTH. Distance is LENGTH - attacker's x coordinate
+        if ((LENGTH - p.x) <= r) inRange = true;
+    }
+
+    if (!inRange) {
+        std::cout << "Attack failed: Domain is out of range." << std::endl;
+        return;
+    }
+
+    int attackRoll = rollDice();
+    int totalAttack = attackRoll + attacker->getAttackBonus();
+
+    // Domain has no defense, takes 100% damage
+    std::cout << attacker->getName() << " attacks the Domain! Roll: " << attackRoll << " + Bonus: " << attacker->getAttackBonus() << " = " << totalAttack << std::endl;
+
+    targetDomaine->takeDamage(totalAttack);
+    std::cout << "Domain of Player " << (targetDomaine->getOwner() == Player::Player1 ? "1" : "2")
+              << " takes " << totalAttack << " damage. Current HP: " << targetDomaine->getHP() << std::endl;
 }
 
 bool Board::killFidele(Fidele* fidele) {

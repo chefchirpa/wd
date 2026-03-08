@@ -25,7 +25,7 @@ std::string typeToString(FideleType type) {
 }
 
 int main() {
-    Domaine myDomaine;
+    Domaine myDomaine(Player::Player1);
     std::cout << "Domaine initialized with HP: " << myDomaine.getHP() << std::endl;
 
     std::vector<Fidele> fideles;
@@ -100,50 +100,37 @@ int main() {
     board.placeFidele(&myCyclope, startPos);
     std::cout << "Placed " << myCyclope.getName() << " at (" << startPos.x << "," << startPos.y << ")\n";
 
-    // Test a valid move: 2 squares forward, 1 right (Cyclope has 3 Forward, 2 Right)
-    // Note: Player 1 moves "forward" in the +x direction
-    std::vector<Position> validPath = {
-        {3, 4}, // Forward 1
-        {4, 4}, // Forward 2
-        {4, 5}  // Right 1
-    };
+    // Create an opponent Fidele
+    Fidele enemyFidele = fideles[0]; // clone Cyclope
+    enemyFidele.setOwner(Player::Player2);
 
-    if (board.moveFidele(&myCyclope, validPath)) {
-        std::cout << "Valid move successful! New position: ("
-                  << myCyclope.getPosition().x << "," << myCyclope.getPosition().y << ")\n";
-    } else {
-        std::cout << "Valid move failed.\n";
+    Position enemyStartPos = {2, 5}; // Within range 2 of (2,4)
+    board.placeFidele(&enemyFidele, enemyStartPos);
+    std::cout << "Placed Enemy " << enemyFidele.getName() << " at (" << enemyStartPos.x << "," << enemyStartPos.y << ")\n";
+
+    std::cout << "\n--- Testing Combat: Fidele vs Fidele ---\n";
+
+    // Player 1's Cyclope attacks Player 2's Cyclope
+    board.attackFidele(&myCyclope, &enemyFidele);
+
+    // Give enemy 1 HP so next attack likely kills
+    if (enemyFidele.isAlive()) {
+        enemyFidele.takeDamage(enemyFidele.getCurrentHP() - 1);
+        std::cout << "\n[Setting Enemy HP to 1 to force a kill on next hit]\n";
+        board.attackFidele(&myCyclope, &enemyFidele);
     }
 
-    // Test an invalid move: moving diagonally
-    std::vector<Position> invalidPath = {
-        {5, 6} // Diagonal move from {4,5}
-    };
+    std::cout << "\n--- Testing Combat: Fidele vs Domaine ---\n";
 
-    if (board.moveFidele(&myCyclope, invalidPath)) {
-        std::cout << "Invalid move succeeded (Error!).\n";
-    } else {
-        std::cout << "Invalid move rejected successfully (No diagonals).\n";
-    }
+    // Player 2's Domain is at the right edge (x >= 12).
+    // MyCyclope has Range 2. If we put him at x=10, distance is 12 - 10 = 2.
+    Position attackDomainPos = {10, 4};
+    // Force place him there (for testing)
+    board.killFidele(&myCyclope); // Remove from old spot to avoid grid conflict
+    myCyclope.setAlive(true);
+    board.placeFidele(&myCyclope, attackDomainPos);
 
-    // Test killing and resurrecting
-    std::cout << "\nKilling " << myCyclope.getName() << "...\n";
-    board.killFidele(&myCyclope);
-
-    if (!myCyclope.isAlive()) {
-        std::cout << myCyclope.getName() << " is dead. Death position recorded at ("
-                  << myCyclope.getDeathPosition().x << "," << myCyclope.getDeathPosition().y << ")\n";
-    }
-
-    std::cout << "Resurrecting " << myCyclope.getName() << "...\n";
-    board.resurrectFidele(&myCyclope);
-
-    if (myCyclope.isAlive() && myCyclope.getPosition() == myCyclope.getDeathPosition()) {
-        std::cout << myCyclope.getName() << " resurrected successfully at ("
-                  << myCyclope.getPosition().x << "," << myCyclope.getPosition().y << ")\n";
-    } else {
-        std::cout << "Resurrection failed.\n";
-    }
+    board.attackDomaine(&myCyclope, board.getDomaine(Player::Player2));
 
     std::cout << "\nFinal Board State:\n";
     board.printBoard();

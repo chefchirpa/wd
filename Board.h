@@ -2,6 +2,7 @@
 
 #include <vector>
 #include "Fidele.h"
+#include "Domaine.h"
 #include "Types.h"
 
 class Board {
@@ -20,6 +21,13 @@ public:
     // Verify if a move through a path is valid according to the rules
     bool isValidMove(Fidele* fidele, const std::vector<Position>& path) const;
 
+    // Combat logic
+    void attackFidele(Fidele* attacker, Fidele* defender);
+    void attackDomaine(Fidele* attacker, Domaine* targetDomaine);
+
+    // Get Domain for player
+    Domaine* getDomaine(Player player);
+
     // Kill a Fidele, marking it dead and leaving its token on the board
     bool killFidele(Fidele* fidele);
 
@@ -30,6 +38,12 @@ public:
     void printBoard() const;
 
 private:
+    Domaine domaine1;
+    Domaine domaine2;
+
+    int rollDice() const;
+    bool isInRange(Position p1, Position p2, int range) const;
+
     // 2D grid storing pointers to Fidele. A square can have a living Fidele,
     // or a dead Fidele token (which prevents stopping, but allows passing over).
     Fidele* grid[LENGTH][WIDTH];
