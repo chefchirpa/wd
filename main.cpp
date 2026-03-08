@@ -303,5 +303,32 @@ int main() {
     std::cout << "\n[Board State After Moves]\n";
     board.displayBoard();
 
+    // --- Testing Victory Conditions ---
+    std::cout << "\n--- Testing Victory Conditions ---\n";
+    std::cout << "[Setting Player 1 Domain HP to 1 to force victory via direct attack]\n";
+
+    // Ulysse (P1) is at {2, 4} and has Range 3
+    // Cyclope (P2) is at {8, 3} and has Range 4
+
+    // Let's force Cyclope to attack P1's Domain (Olympe).
+    // Olympe is adjacent to x = 0.
+    // Cyclope is at x = 8. He needs to move within his range of 4 to hit the Domain (so x <= 4).
+    // We will place him directly at x = 3 to guarantee the range.
+    board.removeFideleFromGrid(cyclopePtr);
+    cyclopePtr->setAlive(true);
+    Position newCyclopePos = {3, 3};
+    // Re-place him using moveFidele trick to bypass initial placement restrictions
+    std::vector<Position> jumpPath = { newCyclopePos };
+
+    // We can't easily moveFidele as it validates distance. We'll simply manually place it using placeFidele (which bypasses placement rules)
+    board.placeFidele(cyclopePtr, newCyclopePos);
+    cyclopePtr->setOwner(Player::Player2); // Re-affirm ownership
+
+    Domaine* olympe = board.getDomaine(Player::Player1);
+    olympe->setHP(1); // Set it low to guarantee it drops to 0 on hit
+
+    std::cout << "Cyclope is at (" << newCyclopePos.x << "," << newCyclopePos.y << ") with Range " << cyclopePtr->getRange() << ". P1 Domain is at x=0.\n";
+    board.attackDomaine(cyclopePtr, olympe);
+
     return 0;
 }

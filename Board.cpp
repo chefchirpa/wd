@@ -221,6 +221,12 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
                 defenderDomaine->takeDamage(1);
                 std::cout << "Domain of Player " << (defender->getOwner() == Player::Player1 ? "1" : "2")
                           << " loses 1 HP. Current HP: " << defenderDomaine->getHP() << std::endl;
+
+                if (defenderDomaine->getHP() <= 0) {
+                    std::cout << "\n*** VICTORY! ***\n";
+                    std::cout << "Player " << (defender->getOwner() == Player::Player1 ? "2 (Pantheon)" : "1 (Olympe)")
+                              << " has destroyed the enemy Domain and won the game!" << std::endl;
+                }
             }
         } else {
             std::cout << defender->getName() << " survives with " << defender->getCurrentHP() << " HP left." << std::endl;
@@ -260,6 +266,12 @@ void Board::attackDomaine(Fidele* attacker, Domaine* targetDomaine) {
     targetDomaine->takeDamage(totalAttack);
     std::cout << "Domain of Player " << (targetDomaine->getOwner() == Player::Player1 ? "1" : "2")
               << " takes " << totalAttack << " damage. Current HP: " << targetDomaine->getHP() << std::endl;
+
+    if (targetDomaine->getHP() <= 0) {
+        std::cout << "\n*** VICTORY! ***\n";
+        std::cout << "Player " << (targetDomaine->getOwner() == Player::Player1 ? "2 (Pantheon)" : "1 (Olympe)")
+                  << " has destroyed the enemy Domain and won the game!" << std::endl;
+    }
 }
 
 bool Board::killFidele(Fidele* fidele) {
@@ -297,6 +309,14 @@ bool Board::resurrectFidele(Fidele* fidele) {
     fidele->setPosition(deathPos);
 
     return true;
+}
+
+void Board::removeFideleFromGrid(Fidele* fidele) {
+    if (!fidele) return;
+    Position currentPos = fidele->getPosition();
+    if (isWithinBounds(currentPos) && grid[currentPos.x][currentPos.y] == fidele) {
+        grid[currentPos.x][currentPos.y] = nullptr;
+    }
 }
 
 bool Board::placeInitialFidele(Fidele* fidele, Position pos, Player player) {

@@ -43,6 +43,9 @@ public:
     // Print a visual representation of the board
     void displayBoard() const;
 
+    // Remove a Fidele strictly from the board grid (used to bypass initial placement issues when forcing positions)
+    void removeFideleFromGrid(Fidele* fidele);
+
 private:
     Domaine domaine1;
     Domaine domaine2;
