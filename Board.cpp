@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib> // For rand
 #include <ctime>   // For time
+#include <algorithm> // For std::find
 
 Board::Board() : domaine1(Player::Player1), domaine2(Player::Player2) {
     std::srand(std::time(nullptr)); // Initialize random seed
@@ -259,22 +260,85 @@ bool Board::resurrectFidele(Fidele* fidele) {
     return true;
 }
 
-void Board::printBoard() const {
+bool Board::placeInitialFidele(Fidele* fidele, Position pos, Player player) {
+    if (!fidele || !isWithinBounds(pos) || isOccupied(pos)) {
+        return false;
+    }
+
+    if (player == Player::Player1) {
+        if (initialPlacementsP1 >= 3 || pos.x > 2) {
+            std::cout << "Invalid placement: Player 1 can only place up to 3 units on rows 0-2." << std::endl;
+            return false;
+        }
+        initialPlacementsP1++;
+    } else if (player == Player::Player2) {
+        if (initialPlacementsP2 >= 3 || pos.x < LENGTH - 3) {
+            std::cout << "Invalid placement: Player 2 can only place up to 3 units on rows " << LENGTH - 3 << "-" << LENGTH - 1 << "." << std::endl;
+            return false;
+        }
+        initialPlacementsP2++;
+    } else {
+        return false;
+    }
+
+    fidele->setOwner(player);
+    grid[pos.x][pos.y] = fidele;
+    fidele->setPosition(pos);
+    fidele->setAlive(true);
+    return true;
+}
+
+void Board::displayBoard() const {
+    std::cout << "===========================================" << std::endl;
+    std::cout << "               WAR DOLLS                   " << std::endl;
+    std::cout << "===========================================" << std::endl;
+    std::cout << " Olympe Domain (P1) HP: " << domaine1.getHP() << " / 20" << std::endl;
+    std::cout << " Pantheon Domain (P2) HP: " << domaine2.getHP() << " / 20" << std::endl;
+    std::cout << "===========================================" << std::endl;
+
+    std::vector<Fidele*> activeUnits;
+
     for (int i = 0; i < LENGTH; ++i) {
+        std::cout << " ";
         for (int j = 0; j < WIDTH; ++j) {
             Fidele* f = grid[i][j];
             if (f == nullptr) {
-                std::cout << ". ";
+                std::cout << "[.] ";
             } else {
                 if (!f->isAlive()) {
-                    std::cout << "x "; // Dead token
-                } else if (f->getOwner() == Player::Player1) {
-                    std::cout << "1 ";
+                    std::cout << "[X] "; // Dead token
                 } else {
-                    std::cout << "2 ";
+                    if (f->getFaction() == Faction::Greek) {
+                        std::cout << "[G] ";
+                    } else if (f->getFaction() == Faction::Roman) {
+                        std::cout << "[R] ";
+                    } else {
+                        // Fallback if no faction
+                        std::cout << (f->getOwner() == Player::Player1 ? "[1] " : "[2] ");
+                    }
+
+                    // Add to active units to list their stats later
+                    // Only add once in case of weird grid bugs, but should only be in grid once
+                    if (std::find(activeUnits.begin(), activeUnits.end(), f) == activeUnits.end()) {
+                        activeUnits.push_back(f);
+                    }
                 }
             }
         }
         std::cout << std::endl;
     }
+
+    std::cout << "-------------------------------------------" << std::endl;
+    std::cout << "Active Units Stats:" << std::endl;
+    if (activeUnits.empty()) {
+        std::cout << "  (None)" << std::endl;
+    } else {
+        for (Fidele* f : activeUnits) {
+            std::cout << "  - " << f->getName()
+                      << " (" << (f->getOwner() == Player::Player1 ? "P1" : "P2") << ") | "
+                      << "HP: " << f->getCurrentHP() << "/" << f->getHP() << " | "
+                      << "Range: " << f->getRange() << std::endl;
+        }
+    }
+    std::cout << "===========================================" << std::endl;
 }

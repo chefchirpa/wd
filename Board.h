@@ -34,12 +34,18 @@ public:
     // Resurrect a Fidele at its death position
     bool resurrectFidele(Fidele* fidele);
 
-    // Print a simple representation of the board for debugging
-    void printBoard() const;
+    // Place a Fidele during setup (max 3 per player on their first 3 rows)
+    bool placeInitialFidele(Fidele* fidele, Position pos, Player player);
+
+    // Print a visual representation of the board
+    void displayBoard() const;
 
 private:
     Domaine domaine1;
     Domaine domaine2;
+
+    int initialPlacementsP1 = 0;
+    int initialPlacementsP2 = 0;
 
     int rollDice() const;
     bool isInRange(Position p1, Position p2, int range) const;

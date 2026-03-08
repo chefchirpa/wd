@@ -219,10 +219,12 @@ int main() {
         std::cout << "  Desc: " << fidele.getDescription() << "\n";
     }
 
-    // Set back to English for logging in the rest of the demo
-    Fidele::currentLanguage = Language::English;
+    // --- Visual Simulation Demo ---
+    std::cout << "\n--- Visual Simulation Test ---\n";
 
-    std::cout << "\n--- Testing Board Logic ---\n";
+    // Use French Language
+    Fidele::currentLanguage = Language::French;
+
     Board board;
 
     if (fideles.empty()) {
@@ -230,48 +232,46 @@ int main() {
         return 1;
     }
 
-    // Give the first Fidele to Player 1 and place it on the board
-    Fidele& myCyclope = fideles[0];
-    myCyclope.setOwner(Player::Player1);
-
-    Position startPos = {2, 4};
-    board.placeFidele(&myCyclope, startPos);
-    std::cout << "Placed " << myCyclope.getName() << " at (" << startPos.x << "," << startPos.y << ")\n";
-
-    // Create an opponent Fidele
-    Fidele enemyFidele = fideles[0]; // clone Cyclope
-    enemyFidele.setOwner(Player::Player2);
-
-    Position enemyStartPos = {2, 5}; // Within range 2 of (2,4)
-    board.placeFidele(&enemyFidele, enemyStartPos);
-    std::cout << "Placed Enemy " << enemyFidele.getName() << " at (" << enemyStartPos.x << "," << enemyStartPos.y << ")\n";
-
-    std::cout << "\n--- Testing Combat: Fidele vs Fidele ---\n";
-
-    // Player 1's Cyclope attacks Player 2's Cyclope
-    board.attackFidele(&myCyclope, &enemyFidele);
-
-    // Give enemy 1 HP so next attack likely kills
-    if (enemyFidele.isAlive()) {
-        enemyFidele.takeDamage(enemyFidele.getCurrentHP() - 1);
-        std::cout << "\n[Setting Enemy HP to 1 to force a kill on next hit]\n";
-        board.attackFidele(&myCyclope, &enemyFidele);
+    // Find "Cyclope" in the loaded fideles
+    Fidele* cyclopePtr = nullptr;
+    for (auto& f : fideles) {
+        if (f.getName() == "Cyclope") {
+            cyclopePtr = &f;
+            break;
+        }
     }
 
-    std::cout << "\n--- Testing Combat: Fidele vs Domaine ---\n";
+    if (!cyclopePtr) {
+        std::cerr << "Could not find Cyclope in the CSV." << std::endl;
+        return 1;
+    }
 
-    // Player 2's Domain is at the right edge (x >= 12).
-    // MyCyclope has Range 2. If we put him at x=10, distance is 12 - 10 = 2.
-    Position attackDomainPos = {10, 4};
-    // Force place him there (for testing)
-    board.killFidele(&myCyclope); // Remove from old spot to avoid grid conflict
-    myCyclope.setAlive(true);
-    board.placeFidele(&myCyclope, attackDomainPos);
+    // Cyclops is Roman. Let's place him for Player 2 (Pantheon)
+    Position p2StartPos = {10, 4}; // Row 10 is within the first 3 rows from P2's side (9, 10, 11)
 
-    board.attackDomaine(&myCyclope, board.getDomaine(Player::Player2));
+    if (board.placeInitialFidele(cyclopePtr, p2StartPos, Player::Player2)) {
+        std::cout << "Successfully placed " << cyclopePtr->getName() << " at (" << p2StartPos.x << "," << p2StartPos.y << ")" << std::endl;
+    } else {
+        std::cout << "Failed to place " << cyclopePtr->getName() << std::endl;
+    }
 
-    std::cout << "\nFinal Board State:\n";
-    board.printBoard();
+    // Let's add an enemy Greek unit just for fun to see both tags
+    Fidele* heroPtr = nullptr;
+    for (auto& f : fideles) {
+        if (f.getFaction() == Faction::Greek && f.getType() == FideleType::Heros) {
+            heroPtr = &f;
+            break;
+        }
+    }
+
+    if (heroPtr) {
+        Position p1StartPos = {2, 4}; // Row 2 is within the first 3 rows from P1's side (0, 1, 2)
+        board.placeInitialFidele(heroPtr, p1StartPos, Player::Player1);
+    }
+
+    // Display the simulated visual board
+    std::cout << "\n";
+    board.displayBoard();
 
     return 0;
 }
