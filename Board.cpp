@@ -202,7 +202,10 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     int attackRoll = rollDice();
     int defenseRoll = rollDice();
 
-    int totalAttack = attackRoll + attacker->getAttackBonus();
+    int additionalAttackBonus = 0;
+    attacker->applyOffensiveAbility(defender, additionalAttackBonus);
+
+    int totalAttack = attackRoll + attacker->getAttackBonus() + additionalAttackBonus;
     int totalDefense = defenseRoll + defender->getDefenseBonus();
 
     int damage = totalAttack - totalDefense;

@@ -70,6 +70,9 @@ public:
         return 0;
     }
 
+    // Apply special ability logic modifying combat stats
+    void applyOffensiveAbility(Fidele* target, int& additionalAttackBonus) const;
+
     Position getPosition() const { return currentPosition; }
     void setPosition(Position pos) { currentPosition = pos; }
 

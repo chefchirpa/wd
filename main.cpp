@@ -545,6 +545,19 @@ int main(int argc, char* argv[]) {
         std::cout << "-> Achille moved successfully to (" << achillePtr->getPosition().x << "," << achillePtr->getPosition().y << ")!\n";
     }
 
+    // --- Testing Special Abilities ---
+    std::cout << "\n--- Testing Cyclope's Special Ability (Œil) ---\n";
+    // Achille (P1) is at (0, 4). Let's put Cyclope (P2) at (2, 4) directly in front of him on the same column.
+    board.removeFideleFromGrid(cyclopePtr);
+    Position combatPos = {2, 4};
+    board.placeFidele(cyclopePtr, combatPos);
+    std::cout << "[Teleported Cyclope to (2,4) to be directly in front of Achille for combat]\n";
+
+    // Simulate Cyclope attacking Achille
+    std::string attackCmd = "ATTACK Cyclope Achille";
+    std::cout << "Command received: " << attackCmd << "\n";
+    board.attackFidele(cyclopePtr, achillePtr);
+
     // --- Testing PLAY_GOD command ---
     std::cout << "\n--- Testing PLAY_GOD command ---\n";
 
