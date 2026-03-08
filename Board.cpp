@@ -306,6 +306,7 @@ bool Board::resurrectFidele(Fidele* fidele) {
 
     grid[deathPos.x][deathPos.y] = fidele;
     fidele->setAlive(true);
+    fidele->resetHP();
     fidele->setPosition(deathPos);
 
     return true;
@@ -317,6 +318,41 @@ void Board::removeFideleFromGrid(Fidele* fidele) {
     if (isWithinBounds(currentPos) && grid[currentPos.x][currentPos.y] == fidele) {
         grid[currentPos.x][currentPos.y] = nullptr;
     }
+}
+
+Position Board::getFirstEmptyStartRow(Player player) const {
+    if (player == Player::Player1) {
+        for (int x = 0; x < 3; ++x) {
+            for (int y = 0; y < WIDTH; ++y) {
+                if (grid[x][y] == nullptr) return {x, y};
+            }
+        }
+    } else if (player == Player::Player2) {
+        for (int x = LENGTH - 1; x >= LENGTH - 3; --x) {
+            for (int y = 0; y < WIDTH; ++y) {
+                if (grid[x][y] == nullptr) return {x, y};
+            }
+        }
+    }
+    return {-1, -1};
+}
+
+bool Board::placeNewFidele(Fidele* fidele, Position pos, Player player) {
+    if (!fidele || !isWithinBounds(pos) || isOccupied(pos)) {
+        return false;
+    }
+
+    if (player == Player::Player1 && pos.x > 2) {
+        return false; // Must be in first 3 rows
+    } else if (player == Player::Player2 && pos.x < LENGTH - 3) {
+        return false; // Must be in first 3 rows
+    }
+
+    fidele->setOwner(player);
+    grid[pos.x][pos.y] = fidele;
+    fidele->setPosition(pos);
+    fidele->setAlive(true);
+    return true;
 }
 
 bool Board::placeInitialFidele(Fidele* fidele, Position pos, Player player) {

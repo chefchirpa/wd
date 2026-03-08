@@ -4,6 +4,9 @@
 #include <vector>
 #include <string>
 #include <curl/curl.h>
+#include <deque>
+#include <algorithm>
+#include <random>
 
 #include "Fidele.h"
 #include "Domaine.h"
@@ -11,6 +14,12 @@
 
 // Define the static Language variable from Fidele
 Language Fidele::currentLanguage = Language::English;
+
+struct PlayerState {
+    std::deque<Fidele*> deck;
+    std::vector<Fidele*> hand;
+    Player playerId;
+};
 
 // Callback function for libcurl to write received data into a std::string
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
@@ -97,6 +106,150 @@ std::vector<std::string> parseCSVLine(const std::string& line) {
     }
 
     return result;
+}
+
+void setupGame(std::vector<Fidele>& allFideles, PlayerState& p1, PlayerState& p2) {
+    p1.playerId = Player::Player1;
+    p2.playerId = Player::Player2;
+
+    std::vector<Fidele*> greekUnits;
+    std::vector<Fidele*> romanUnits;
+
+    for (auto& f : allFideles) {
+        if (f.getFaction() == Faction::Greek) greekUnits.push_back(&f);
+        else if (f.getFaction() == Faction::Roman) romanUnits.push_back(&f);
+    }
+
+    // Shuffle the lists
+    auto rng = std::default_random_engine{};
+    std::shuffle(std::begin(greekUnits), std::end(greekUnits), rng);
+    std::shuffle(std::begin(romanUnits), std::end(romanUnits), rng);
+
+    // Pick up to 10 for each
+    for (size_t i = 0; i < 10 && i < greekUnits.size(); ++i) {
+        greekUnits[i]->setOwner(Player::Player1);
+        p1.deck.push_back(greekUnits[i]);
+    }
+    for (size_t i = 0; i < 10 && i < romanUnits.size(); ++i) {
+        romanUnits[i]->setOwner(Player::Player2);
+        p2.deck.push_back(romanUnits[i]);
+    }
+
+    // Deal 5 cards initially
+    for (int i = 0; i < 5; ++i) {
+        if (!p1.deck.empty()) {
+            p1.hand.push_back(p1.deck.front());
+            p1.deck.pop_front();
+        }
+        if (!p2.deck.empty()) {
+            p2.hand.push_back(p2.deck.front());
+            p2.deck.pop_front();
+        }
+    }
+}
+
+struct GameState {
+    PlayerState* p1;
+    PlayerState* p2;
+};
+
+void checkAndProcessDeaths(GameState& state, const std::vector<Fidele>& allFideles) {
+    for (auto& f : const_cast<std::vector<Fidele>&>(allFideles)) {
+        if (!f.isAlive() && f.getOwner() != Player::None && f.getDeathPosition().x != -1) {
+            PlayerState* ownerState = (f.getOwner() == Player::Player1) ? state.p1 : state.p2;
+
+            // Is it already in the deck?
+            bool inDeck = false;
+            for (auto* deckUnit : ownerState->deck) {
+                if (deckUnit == &f) { inDeck = true; break; }
+            }
+            // Is it in the hand?
+            bool inHand = false;
+            for (auto* handUnit : ownerState->hand) {
+                if (handUnit == &f) { inHand = true; break; }
+            }
+
+            if (!inDeck && !inHand) {
+                // It just died. Put it at the bottom of the deck.
+                std::cout << f.getName() << "'s card is returned to the bottom of the deck.\n";
+                ownerState->deck.push_back(&f);
+            }
+        }
+    }
+}
+
+void printHand(const PlayerState& p) {
+    std::cout << "Current Hand (" << (p.playerId == Player::Player1 ? "Player 1" : "Player 2") << "): [";
+    for (size_t i = 0; i < p.hand.size(); ++i) {
+        std::cout << p.hand[i]->getName();
+        if (i < p.hand.size() - 1) std::cout << ", ";
+    }
+    std::cout << "]\n";
+}
+
+void executeInvocationPhase(PlayerState& p, Board& board) {
+    std::cout << "\n===========================================\n";
+    std::cout << "--- TURN INVOCATION PHASE: " << (p.playerId == Player::Player1 ? "PLAYER 1 (Greek)" : "PLAYER 2 (Roman)") << " ---\n";
+
+    // 1. Draw 2 cards
+    for (int i = 0; i < 2; ++i) {
+        if (!p.deck.empty()) {
+            p.hand.push_back(p.deck.front());
+            p.deck.pop_front();
+        }
+    }
+    std::cout << "Drew 2 cards from the deck.\n";
+
+    // 2. Discard 1 card to the bottom of the deck
+    if (!p.hand.empty()) {
+        Fidele* discarded = p.hand.back();
+        p.hand.pop_back();
+        p.deck.push_back(discarded);
+        std::cout << "Discarded " << discarded->getName() << " to the bottom of the deck.\n";
+    }
+
+    // 3. Play 1 unit on the board
+    if (!p.hand.empty()) {
+        Fidele* played = p.hand.front();
+        p.hand.erase(p.hand.begin());
+
+        bool placed = false;
+
+        // Check for Resurrection
+        Position deathPos = played->getDeathPosition();
+        if (deathPos.x != -1 && deathPos.y != -1) {
+            std::cout << "Attempting to resurrect " << played->getName() << " at its death position...\n";
+            placed = board.resurrectFidele(played);
+        }
+
+        // Standard placement
+        if (!placed) {
+            Position startPos = board.getFirstEmptyStartRow(p.playerId);
+            if (startPos.x != -1) {
+                placed = board.placeNewFidele(played, startPos, p.playerId);
+            }
+        }
+
+        if (placed) {
+            std::cout << "Played " << played->getName() << " onto the board.\n";
+        } else {
+            std::cout << "Failed to play " << played->getName() << ". Putting back in hand.\n";
+            p.hand.push_back(played);
+        }
+    }
+
+    // Print Hand
+    printHand(p);
+
+    // End of Turn Maintenance: Refill hand to 2 if needed
+    while (p.hand.size() < 2 && !p.deck.empty()) {
+        p.hand.push_back(p.deck.front());
+        p.deck.pop_front();
+    }
+
+    // Display the updated board state
+    std::cout << "\n[Board State After Invocation]\n";
+    board.displayBoard();
 }
 
 int main() {
@@ -264,76 +417,79 @@ int main() {
         std::cout << "-> Achille moved successfully to (" << achillePtr->getPosition().x << "," << achillePtr->getPosition().y << ")!\n";
     }
 
-    // Display the simulated visual board after moves
-    std::cout << "\n[Board State After Moves]\n";
-    board.displayBoard();
-
-    // --- Testing ATTACK command ---
-    std::cout << "\n--- Testing ATTACK command ---\n";
-
-    // Achille range is 2. Let's teleport Cyclope in range.
-    board.removeFideleFromGrid(cyclopePtr);
-    Position combatPos = {achillePtr->getPosition().x + 1, achillePtr->getPosition().y};
-    board.placeFidele(cyclopePtr, combatPos);
-    std::cout << "[Teleported Cyclope to be adjacent to Achille for combat]\n";
-
-    // Simulate Achille attacking Cyclope
-    std::string command = "ATTACK Achille Cyclope";
-    std::cout << "Command received: " << command << "\n";
-
-    // Simple mock parser
-    if (command.rfind("ATTACK ", 0) == 0) {
-        std::string args = command.substr(7);
-        size_t spacePos = args.find(' ');
-        if (spacePos != std::string::npos) {
-            std::string attackerName = args.substr(0, spacePos);
-            std::string defenderName = args.substr(spacePos + 1);
-
-            Fidele* att = nullptr;
-            Fidele* def = nullptr;
-
-            for (auto& f : fideles) {
-                if (f.getName() == attackerName && f.isAlive() && f.getPosition().x != -1) att = &f;
-                if (f.getName() == defenderName && f.isAlive() && f.getPosition().x != -1) def = &f;
-            }
-
-            if (att && def) {
-                board.attackFidele(att, def);
-            } else {
-                std::cout << "Attack failed: Could not find valid units on the board.\n";
-            }
-        }
+    // --- FULL GAME LOOP ---
+    std::cout << "\n--- Setting up standard game loop ---\n";
+    board = Board(); // Reset board to clean state
+    // Reset Fidele objects states
+    for (auto& f : fideles) {
+        f.setAlive(true);
+        f.setPosition({-1, -1});
+        f.setDeathPosition({-1, -1});
+        f.setOwner(Player::None);
     }
 
-    std::cout << "\n[Board State After Attack]\n";
-    board.displayBoard();
+    PlayerState player1, player2;
+    setupGame(fideles, player1, player2);
+    GameState state = { &player1, &player2 };
 
-    // --- Testing Victory Conditions ---
-    std::cout << "\n--- Testing Victory Conditions ---\n";
-    std::cout << "[Setting Player 1 Domain HP to 1 to force victory via direct attack]\n";
+    std::cout << "Game setup complete.\n";
+    std::cout << "Player 1 Deck: " << player1.deck.size() << " cards, Hand: " << player1.hand.size() << " cards\n";
+    std::cout << "Player 2 Deck: " << player2.deck.size() << " cards, Hand: " << player2.hand.size() << " cards\n";
 
-    // Ulysse (P1) is at {2, 4} and has Range 3
-    // Cyclope (P2) is at {8, 3} and has Range 4
+    bool gameIsRunning = true;
+    int turnCounter = 1;
 
-    // Let's force Cyclope to attack P1's Domain (Olympe).
-    // Olympe is adjacent to x = 0.
-    // Cyclope is at x = 8. He needs to move within his range of 4 to hit the Domain (so x <= 4).
-    // We will place him directly at x = 3 to guarantee the range.
-    board.removeFideleFromGrid(cyclopePtr);
-    cyclopePtr->setAlive(true);
-    Position newCyclopePos = {3, 3};
-    // Re-place him using moveFidele trick to bypass initial placement restrictions
-    std::vector<Position> jumpPath = { newCyclopePos };
+    // Simulation loop. We will run max 4 turns to avoid infinite loops in test
+    while (gameIsRunning && turnCounter <= 4) {
+        std::cout << "\n===========================================\n";
+        std::cout << "               TURN " << turnCounter << "\n";
+        std::cout << "===========================================\n";
 
-    // We can't easily moveFidele as it validates distance. We'll simply manually place it using placeFidele (which bypasses placement rules)
-    board.placeFidele(cyclopePtr, newCyclopePos);
-    cyclopePtr->setOwner(Player::Player2); // Re-affirm ownership
+        // --- Player 1 Turn ---
+        checkAndProcessDeaths(state, fideles); // Check if cards need returning to deck
+        executeInvocationPhase(player1, board);
 
-    Domaine* olympe = board.getDomaine(Player::Player1);
-    olympe->setHP(1); // Set it low to guarantee it drops to 0 on hit
+        // Simulated P1 Actions (Randomly attack something to trigger death logic)
+        for (auto& p1Unit : fideles) {
+            if (p1Unit.getOwner() == Player::Player1 && p1Unit.isAlive() && p1Unit.getPosition().x != -1) {
+                // Just attack P2 domain if possible, else attack any enemy in range
+                board.attackDomaine(&p1Unit, board.getDomaine(Player::Player2));
 
-    std::cout << "Cyclope is at (" << newCyclopePos.x << "," << newCyclopePos.y << ") with Range " << cyclopePtr->getRange() << ". P1 Domain is at x=0.\n";
-    board.attackDomaine(cyclopePtr, olympe);
+                for (auto& p2Unit : fideles) {
+                    if (p2Unit.getOwner() == Player::Player2 && p2Unit.isAlive() && p2Unit.getPosition().x != -1) {
+                        board.attackFidele(&p1Unit, &p2Unit);
+                    }
+                }
+            }
+        }
+
+        if (board.getDomaine(Player::Player2)->getHP() <= 0) { gameIsRunning = false; break; }
+
+        // --- Player 2 Turn ---
+        checkAndProcessDeaths(state, fideles); // Check if cards need returning to deck
+        executeInvocationPhase(player2, board);
+
+        // Simulated P2 Actions
+        for (auto& p2Unit : fideles) {
+            if (p2Unit.getOwner() == Player::Player2 && p2Unit.isAlive() && p2Unit.getPosition().x != -1) {
+                board.attackDomaine(&p2Unit, board.getDomaine(Player::Player1));
+
+                for (auto& p1Unit : fideles) {
+                    if (p1Unit.getOwner() == Player::Player1 && p1Unit.isAlive() && p1Unit.getPosition().x != -1) {
+                        board.attackFidele(&p2Unit, &p1Unit);
+                    }
+                }
+            }
+        }
+
+        if (board.getDomaine(Player::Player1)->getHP() <= 0) { gameIsRunning = false; break; }
+
+        turnCounter++;
+    }
+
+    if (turnCounter > 4) {
+        std::cout << "\n[Test simulation finished successfully after 4 turns]\n";
+    }
 
     return 0;
 }

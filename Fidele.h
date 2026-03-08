@@ -41,6 +41,7 @@ public:
         currentHp -= amount;
         if (currentHp < 0) currentHp = 0;
     }
+    void resetHP() { currentHp = hp; }
 
     int getRange() const { return range; }
     Movement getMovement() const { return movement; }

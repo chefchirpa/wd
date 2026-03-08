@@ -37,8 +37,14 @@ public:
     // Resurrect a Fidele at its death position
     bool resurrectFidele(Fidele* fidele);
 
+    // Find first empty position in the player's starting rows
+    Position getFirstEmptyStartRow(Player player) const;
+
     // Place a Fidele during setup (max 3 per player on their first 3 rows)
     bool placeInitialFidele(Fidele* fidele, Position pos, Player player);
+
+    // Place a new Fidele from hand during the game (first 3 rows, no overall limit)
+    bool placeNewFidele(Fidele* fidele, Position pos, Player player);
 
     // Print a visual representation of the board
     void displayBoard() const;
