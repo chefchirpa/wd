@@ -23,6 +23,11 @@ bool Board::isOccupied(Position pos) const {
     return grid[pos.x][pos.y] != nullptr;
 }
 
+Fidele* Board::getFideleAt(Position pos) const {
+    if (!isWithinBounds(pos)) return nullptr;
+    return grid[pos.x][pos.y];
+}
+
 bool Board::placeFidele(Fidele* fidele, Position pos) {
     if (!fidele || !isWithinBounds(pos) || isOccupied(pos)) {
         return false;
@@ -205,8 +210,11 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     int additionalAttackBonus = 0;
     attacker->applyOffensiveAbility(defender, additionalAttackBonus);
 
+    int additionalDefenseBonus = 0;
+    defender->applyDefensiveAbility(this, additionalDefenseBonus);
+
     int totalAttack = attackRoll + attacker->getAttackBonus() + additionalAttackBonus;
-    int totalDefense = defenseRoll + defender->getDefenseBonus();
+    int totalDefense = defenseRoll + defender->getDefenseBonus() + additionalDefenseBonus;
 
     int damage = totalAttack - totalDefense;
     if (damage < 0) damage = 0;

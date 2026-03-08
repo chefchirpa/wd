@@ -546,17 +546,46 @@ int main(int argc, char* argv[]) {
     }
 
     // --- Testing Special Abilities ---
-    std::cout << "\n--- Testing Cyclope's Special Ability (Œil) ---\n";
+    std::cout << "\n--- Testing Special Abilities ---\n";
+
+    // Test 1: Cyclope Offense
+    std::cout << ">> Testing Cyclope (Œil) Offensive Power\n";
     // Achille (P1) is at (0, 4). Let's put Cyclope (P2) at (2, 4) directly in front of him on the same column.
     board.removeFideleFromGrid(cyclopePtr);
     Position combatPos = {2, 4};
     board.placeFidele(cyclopePtr, combatPos);
     std::cout << "[Teleported Cyclope to (2,4) to be directly in front of Achille for combat]\n";
-
-    // Simulate Cyclope attacking Achille
-    std::string attackCmd = "ATTACK Cyclope Achille";
-    std::cout << "Command received: " << attackCmd << "\n";
+    std::cout << "Command received: ATTACK Cyclope Achille\n";
     board.attackFidele(cyclopePtr, achillePtr);
+
+    // Test 2: Phalange Defense
+    std::cout << "\n>> Testing Phalange Defensive Power\n";
+    // Let's create a dummy Roman unit with "Phalange" and place allies around it
+    Fidele romanSoldier = fideles[0];
+    for (auto& f : fideles) {
+        if (f.getName() == "Soldat romain" || f.getName() == "Roman soldier") romanSoldier = f;
+    }
+    romanSoldier.setOwner(Player::Player2);
+    romanSoldier.setAbility("Phalanx", "Phalange"); // Override to force test
+
+    Position defPos = {5, 5};
+    board.placeFidele(&romanSoldier, defPos);
+
+    // Give it 2 Roman allies
+    Fidele ally1 = fideles[1]; ally1.setOwner(Player::Player2);
+    Fidele ally2 = fideles[2]; ally2.setOwner(Player::Player2);
+    board.placeFidele(&ally1, {4, 5}); // Up
+    board.placeFidele(&ally2, {5, 6}); // Right
+
+    std::cout << "[Teleported Soldat romain to (5,5) with 2 allies at (4,5) and (5,6)]\n";
+
+    // Achille attacks the Soldat romain
+    // Move Achille close enough to attack
+    board.removeFideleFromGrid(achillePtr);
+    board.placeFidele(achillePtr, {5, 4});
+
+    std::cout << "Command received: ATTACK Achille Soldat romain\n";
+    board.attackFidele(achillePtr, &romanSoldier);
 
     // --- Testing PLAY_GOD command ---
     std::cout << "\n--- Testing PLAY_GOD command ---\n";

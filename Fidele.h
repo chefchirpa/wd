@@ -72,6 +72,7 @@ public:
 
     // Apply special ability logic modifying combat stats
     void applyOffensiveAbility(Fidele* target, int& additionalAttackBonus) const;
+    void applyDefensiveAbility(class Board* board, int& additionalDefenseBonus) const;
 
     Position getPosition() const { return currentPosition; }
     void setPosition(Position pos) { currentPosition = pos; }
@@ -85,6 +86,13 @@ private:
     std::string abilityEn;
     std::string abilityFr;
     std::string descEn;
+
+public:
+    // Helper to override ability for testing specific dynamic triggers
+    void setAbility(const std::string& en, const std::string& fr) {
+        abilityEn = en;
+        abilityFr = fr;
+    }
     std::string descFr;
 
     Faction faction;

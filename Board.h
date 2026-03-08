@@ -24,6 +24,9 @@ public:
     // Verify if a move through a path is valid according to the rules
     bool isValidMove(Fidele* fidele, const std::vector<Position>& path) const;
 
+    // Helper for grid context (like checking adjacent allies)
+    Fidele* getFideleAt(Position pos) const;
+
     // Combat logic
     void attackFidele(Fidele* attacker, Fidele* defender);
     void attackDomaine(Fidele* attacker, Domaine* targetDomaine);
