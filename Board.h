@@ -18,6 +18,9 @@ public:
     // Attempt to move a Fidele through a path of positions
     bool moveFidele(Fidele* fidele, const std::vector<Position>& path);
 
+    // Attempt to move a unit interactively by specifying direction (Up, Down, Left, Right) and distance
+    bool moveUnit(Fidele* fidele, const std::string& direction, int distance);
+
     // Verify if a move through a path is valid according to the rules
     bool isValidMove(Fidele* fidele, const std::vector<Position>& path) const;
 

@@ -56,6 +56,43 @@ bool Board::moveFidele(Fidele* fidele, const std::vector<Position>& path) {
     return true;
 }
 
+bool Board::moveUnit(Fidele* fidele, const std::string& direction, int distance) {
+    if (!fidele || !fidele->isAlive() || distance <= 0) {
+        return false;
+    }
+
+    std::vector<Position> path;
+    Position currentPos = fidele->getPosition();
+    Player owner = fidele->getOwner();
+
+    // Build the path step-by-step
+    for (int i = 1; i <= distance; ++i) {
+        Position nextPos = currentPos;
+
+        // Map "Up", "Down", "Left", "Right" based on the player's perspective.
+        // P1 starts at rows 0-2 (top), moves "Up/Forward" towards row 11 (+x).
+        // P2 starts at rows 9-11 (bottom), moves "Up/Forward" towards row 0 (-x).
+        if (owner == Player::Player1) {
+            if (direction == "Up") nextPos.x += 1;
+            else if (direction == "Down") nextPos.x -= 1;
+            else if (direction == "Left") nextPos.y -= 1;
+            else if (direction == "Right") nextPos.y += 1;
+        } else if (owner == Player::Player2) {
+            if (direction == "Up") nextPos.x -= 1;
+            else if (direction == "Down") nextPos.x += 1;
+            else if (direction == "Left") nextPos.y += 1;
+            else if (direction == "Right") nextPos.y -= 1;
+        }
+
+        path.push_back(nextPos);
+        currentPos = nextPos;
+    }
+
+    // Call existing moveFidele which validates the path using isValidMove
+    // (checking stats limits, diagonals, and collisions)
+    return moveFidele(fidele, path);
+}
+
 bool Board::isValidMove(Fidele* fidele, const std::vector<Position>& path) const {
     if (!fidele || !fidele->isAlive() || path.empty()) {
         return false;

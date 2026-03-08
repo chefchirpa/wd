@@ -269,8 +269,38 @@ int main() {
         board.placeInitialFidele(heroPtr, p1StartPos, Player::Player1);
     }
 
-    // Display the simulated visual board
-    std::cout << "\n";
+    // Display the initial board
+    std::cout << "\n[Initial Board State]\n";
+    board.displayBoard();
+
+    // Test interactive movement commands
+    std::cout << "\n--- Testing Interactive Movement ---\n";
+
+    // Cyclope has Up: 3, Down: 1, Left: 2, Right: 2
+    std::cout << "Command: Move Cyclope Up 2\n";
+    if (board.moveUnit(cyclopePtr, "Up", 2)) {
+        std::cout << "-> Cyclope moved successfully!\n";
+    } else {
+        std::cout << "-> Invalid move.\n";
+    }
+
+    std::cout << "Command: Move Cyclope Right 1\n";
+    if (board.moveUnit(cyclopePtr, "Right", 1)) {
+        std::cout << "-> Cyclope moved successfully!\n";
+    } else {
+        std::cout << "-> Invalid move.\n";
+    }
+
+    // Attempt invalid movement exceeding stats (Down 2 instead of max 1)
+    std::cout << "Command: Move Cyclope Down 2 (Exceeds stat limits)\n";
+    if (board.moveUnit(cyclopePtr, "Down", 2)) {
+        std::cout << "-> Cyclope moved successfully!\n";
+    } else {
+        std::cout << "-> Invalid move successfully blocked.\n";
+    }
+
+    // Display the simulated visual board after moves
+    std::cout << "\n[Board State After Moves]\n";
     board.displayBoard();
 
     return 0;
