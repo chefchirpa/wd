@@ -90,7 +90,11 @@ bool Board::moveUnit(Fidele* fidele, const std::string& direction, int distance)
 
     // Call existing moveFidele which validates the path using isValidMove
     // (checking stats limits, diagonals, and collisions)
-    return moveFidele(fidele, path);
+    bool success = moveFidele(fidele, path);
+    if (!success) {
+        std::cout << "Action impossible : ce déplacement n'est pas autorisé par les cieux." << std::endl;
+    }
+    return success;
 }
 
 bool Board::isValidMove(Fidele* fidele, const std::vector<Position>& path) const {
@@ -201,36 +205,32 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     int totalAttack = attackRoll + attacker->getAttackBonus();
     int totalDefense = defenseRoll + defender->getDefenseBonus();
 
-    std::cout << attacker->getName() << " attacks! Roll: " << attackRoll << " + Bonus: " << attacker->getAttackBonus() << " = " << totalAttack << std::endl;
-    std::cout << defender->getName() << " defends! Roll: " << defenseRoll << " + Bonus: " << defender->getDefenseBonus() << " = " << totalDefense << std::endl;
-
     int damage = totalAttack - totalDefense;
-    if (damage < 0) damage = 0; // "points d’attaque ou de défense finaux ne peuvent pas être inférieurs à 0" and difference can't be negative damage
+    if (damage < 0) damage = 0;
 
-    std::cout << "Damage dealt: " << damage << std::endl;
+    std::cout << attacker->getName() << " lance l'assaut ! (Attaque totale: " << totalAttack << ", Défense totale: " << totalDefense << ")" << std::endl;
 
     if (damage > 0) {
         defender->takeDamage(damage);
-        if (defender->getCurrentHP() <= 0) {
-            std::cout << defender->getName() << " has been slain!" << std::endl;
-            killFidele(defender);
+        std::cout << "Dégâts infligés : " << damage << ". PV restants du défenseur : " << defender->getCurrentHP() << "." << std::endl;
 
-            // "chaque fidèle qui périt fait perdre 1 point de vie au domaine des Dieux."
+        if (defender->getCurrentHP() <= 0) {
+            killFidele(defender);
             Domaine* defenderDomaine = getDomaine(defender->getOwner());
+            std::string domainName = (defender->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+
+            std::cout << defender->getName() << " est tombé au combat ! Le domaine " << domainName << " perd 1 PV." << std::endl;
+
             if (defenderDomaine) {
                 defenderDomaine->takeDamage(1);
-                std::cout << "Domain of Player " << (defender->getOwner() == Player::Player1 ? "1" : "2")
-                          << " loses 1 HP. Current HP: " << defenderDomaine->getHP() << std::endl;
-
                 if (defenderDomaine->getHP() <= 0) {
-                    std::cout << "\n*** VICTORY! ***\n";
-                    std::cout << "Player " << (defender->getOwner() == Player::Player1 ? "2 (Pantheon)" : "1 (Olympe)")
-                              << " has destroyed the enemy Domain and won the game!" << std::endl;
+                    std::cout << "\n*** VICTOIRE ! ***\n";
+                    std::cout << "Le domaine " << domainName << " a été détruit. Fin de la guerre !" << std::endl;
                 }
             }
-        } else {
-            std::cout << defender->getName() << " survives with " << defender->getCurrentHP() << " HP left." << std::endl;
         }
+    } else {
+        std::cout << "L'attaque échoue ! " << defender->getName() << " bloque le coup sans subir de dégâts." << std::endl;
     }
 }
 
@@ -260,17 +260,17 @@ void Board::attackDomaine(Fidele* attacker, Domaine* targetDomaine) {
     int attackRoll = rollDice();
     int totalAttack = attackRoll + attacker->getAttackBonus();
 
+    std::string domainName = (targetDomaine->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+
     // Domain has no defense, takes 100% damage
-    std::cout << attacker->getName() << " attacks the Domain! Roll: " << attackRoll << " + Bonus: " << attacker->getAttackBonus() << " = " << totalAttack << std::endl;
+    std::cout << attacker->getName() << " lance l'assaut directement sur le domaine " << domainName << " !" << std::endl;
 
     targetDomaine->takeDamage(totalAttack);
-    std::cout << "Domain of Player " << (targetDomaine->getOwner() == Player::Player1 ? "1" : "2")
-              << " takes " << totalAttack << " damage. Current HP: " << targetDomaine->getHP() << std::endl;
+    std::cout << "Dégâts infligés : " << totalAttack << ". PV restants du domaine " << domainName << " : " << targetDomaine->getHP() << "." << std::endl;
 
     if (targetDomaine->getHP() <= 0) {
-        std::cout << "\n*** VICTORY! ***\n";
-        std::cout << "Player " << (targetDomaine->getOwner() == Player::Player1 ? "2 (Pantheon)" : "1 (Olympe)")
-                  << " has destroyed the enemy Domain and won the game!" << std::endl;
+        std::cout << "\n*** VICTOIRE ! ***\n";
+        std::cout << "Le domaine " << domainName << " a été détruit. Fin de la guerre !" << std::endl;
     }
 }
 
@@ -387,14 +387,18 @@ void Board::displayBoard() const {
     std::cout << "===========================================" << std::endl;
     std::cout << "               WAR DOLLS                   " << std::endl;
     std::cout << "===========================================" << std::endl;
-    std::cout << " Olympe Domain (P1) HP: " << domaine1.getHP() << " / 20" << std::endl;
-    std::cout << " Pantheon Domain (P2) HP: " << domaine2.getHP() << " / 20" << std::endl;
+    std::cout << " Olympe (P1) HP: " << domaine1.getHP() << " / 20" << std::endl;
+    std::cout << " Panthéon (P2) HP: " << domaine2.getHP() << " / 20" << std::endl;
     std::cout << "===========================================" << std::endl;
 
-    std::vector<Fidele*> activeUnits;
+    // Header Coordinates 1-9
+    std::cout << "    1   2   3   4   5   6   7   8   9" << std::endl;
 
     for (int i = 0; i < LENGTH; ++i) {
-        std::cout << " ";
+        // Row letter A-L
+        char rowLabel = 'A' + i;
+        std::cout << " " << rowLabel << " ";
+
         for (int j = 0; j < WIDTH; ++j) {
             Fidele* f = grid[i][j];
             if (f == nullptr) {
@@ -404,36 +408,20 @@ void Board::displayBoard() const {
                     std::cout << "[X] "; // Dead token
                 } else {
                     if (f->getFaction() == Faction::Greek) {
-                        std::cout << "[G] ";
+                        std::cout << "\033[34m[G]\033[0m "; // Blue for Greek
                     } else if (f->getFaction() == Faction::Roman) {
-                        std::cout << "[R] ";
+                        std::cout << "\033[31m[R]\033[0m "; // Red for Roman
                     } else {
                         // Fallback if no faction
-                        std::cout << (f->getOwner() == Player::Player1 ? "[1] " : "[2] ");
-                    }
-
-                    // Add to active units to list their stats later
-                    // Only add once in case of weird grid bugs, but should only be in grid once
-                    if (std::find(activeUnits.begin(), activeUnits.end(), f) == activeUnits.end()) {
-                        activeUnits.push_back(f);
+                        std::cout << (f->getOwner() == Player::Player1 ? "\033[34m[1]\033[0m " : "\033[31m[2]\033[0m ");
                     }
                 }
             }
         }
         std::cout << std::endl;
     }
+    // Footer Coordinates 1-9
+    std::cout << "    1   2   3   4   5   6   7   8   9" << std::endl;
 
     std::cout << "-------------------------------------------" << std::endl;
-    std::cout << "Active Units Stats:" << std::endl;
-    if (activeUnits.empty()) {
-        std::cout << "  (None)" << std::endl;
-    } else {
-        for (Fidele* f : activeUnits) {
-            std::cout << "  - " << f->getName()
-                      << " (" << (f->getOwner() == Player::Player1 ? "P1" : "P2") << ") | "
-                      << "HP: " << f->getCurrentHP() << "/" << f->getHP() << " | "
-                      << "Range: " << f->getRange() << std::endl;
-        }
-    }
-    std::cout << "===========================================" << std::endl;
 }
