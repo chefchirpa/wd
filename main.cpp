@@ -303,6 +303,46 @@ int main() {
     std::cout << "\n[Board State After Moves]\n";
     board.displayBoard();
 
+    // --- Testing ATTACK command ---
+    std::cout << "\n--- Testing ATTACK command ---\n";
+    // Ulysse is at (2, 4) and Cyclope is at (8, 3) -> Out of range.
+    // Let's teleport Cyclope in range to demonstrate a successful ATTACK command
+    board.removeFideleFromGrid(cyclopePtr);
+    Position combatPos = {2, 3}; // Adjacent to Ulysse at (2,4)
+    board.placeFidele(cyclopePtr, combatPos);
+    std::cout << "[Teleported Cyclope to (2,3) to be in range of Ulysse at (2,4)]\n";
+
+    // We will simulate the input: ATTACK Cyclope Ulysse
+    std::string command = "ATTACK Cyclope Ulysse";
+    std::cout << "Command received: " << command << "\n";
+
+    // Simple mock parser
+    if (command.rfind("ATTACK ", 0) == 0) {
+        std::string args = command.substr(7);
+        size_t spacePos = args.find(' ');
+        if (spacePos != std::string::npos) {
+            std::string attackerName = args.substr(0, spacePos);
+            std::string defenderName = args.substr(spacePos + 1);
+
+            Fidele* att = nullptr;
+            Fidele* def = nullptr;
+
+            for (auto& f : fideles) {
+                if (f.getName() == attackerName && f.isAlive() && f.getPosition().x != -1) att = &f;
+                if (f.getName() == defenderName && f.isAlive() && f.getPosition().x != -1) def = &f;
+            }
+
+            if (att && def) {
+                board.attackFidele(att, def);
+            } else {
+                std::cout << "Attack failed: Could not find valid units on the board.\n";
+            }
+        }
+    }
+
+    std::cout << "\n[Board State After Attack]\n";
+    board.displayBoard();
+
     // --- Testing Victory Conditions ---
     std::cout << "\n--- Testing Victory Conditions ---\n";
     std::cout << "[Setting Player 1 Domain HP to 1 to force victory via direct attack]\n";
