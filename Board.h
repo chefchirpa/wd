@@ -30,6 +30,12 @@ public:
     // Helper to determine if two positions are on the same 3x3 tile
     bool isSameTile(Position p1, Position p2) const;
 
+    // Helper to check if a square is occupied by any Fidele (alive or dead)
+    bool isOccupied(Position pos) const;
+
+    // Helper to check standard combat range
+    bool isInRange(Position p1, Position p2, int range) const;
+
     // Combat logic
     void attackFidele(Fidele* attacker, Fidele* defender);
     void attackDomaine(Fidele* attacker, Domaine* targetDomaine);
@@ -69,7 +75,6 @@ private:
     int initialPlacementsP2 = 0;
 
     int rollDice() const;
-    bool isInRange(Position p1, Position p2, int range) const;
 
     // 2D grid storing pointers to Fidele. A square can have a living Fidele,
     // or a dead Fidele token (which prevents stopping, but allows passing over).
@@ -77,7 +82,4 @@ private:
 
     // Helper to check if a coordinate is within bounds
     bool isWithinBounds(Position pos) const;
-
-    // Helper to check if a square is occupied by any Fidele (alive or dead)
-    bool isOccupied(Position pos) const;
 };

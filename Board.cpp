@@ -1,4 +1,5 @@
 #include "Board.h"
+#include "AbilityController.h"
 #include <iostream>
 #include <cmath>
 #include <cstdlib> // For rand
@@ -130,6 +131,9 @@ bool Board::moveUnit(Fidele* fidele, const std::string& direction, int distance)
                 useMermaidSong(fidele, validTarget);
             }
         }
+
+        // Trigger: Check for Interrupts triggered by an enemy moving (Theseus, Odysseus)
+        AbilityController::handlePostMoveInterrupts(this, fidele);
     }
     return success;
 }
@@ -227,12 +231,43 @@ bool Board::isInRange(Position p1, Position p2, int range) const {
     return false;
 }
 
+bool isAmazonTargetingValid(Position attacker, Position target) {
+    // Amazon can attack anyone on her tile or the 4 directly adjacent 3x3 tiles
+    int aTileX = attacker.x / 3;
+    int aTileY = attacker.y / 3;
+    int tTileX = target.x / 3;
+    int tTileY = target.y / 3;
+
+    if (aTileX == tTileX && aTileY == tTileY) return true; // Same tile
+    if (aTileX == tTileX && std::abs(aTileY - tTileY) == 1) return true; // Adjacent horizontally
+    if (aTileY == tTileY && std::abs(aTileX - tTileX) == 1) return true; // Adjacent vertically
+
+    return false;
+}
+
 void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     if (!attacker || !defender || !attacker->isAlive() || !defender->isAlive()) return;
     if (attacker->getOwner() == defender->getOwner()) return; // Can't attack own
 
-    if (!isInRange(attacker->getPosition(), defender->getPosition(), attacker->getRange())) {
-        std::cout << "Attack failed: " << defender->getName() << " is out of range." << std::endl;
+    if (attacker->getSkipNextAttack()) {
+        std::cout << attacker->getName() << " a consommé son action en interceptant (Cheval de Troie) et ne peut pas attaquer ce tour-ci.\n";
+        attacker->setSkipNextAttack(false); // consume flag
+        return;
+    }
+
+    if (AbilityController::isProtectedByHector(this, defender)) {
+        return; // Hector blocks the attack execution entirely
+    }
+
+    bool inRange = false;
+    if (attacker->getAbility() == "Archery" || attacker->getAbility() == "Tir à l'arc") {
+        inRange = isAmazonTargetingValid(attacker->getPosition(), defender->getPosition());
+    } else {
+        inRange = isInRange(attacker->getPosition(), defender->getPosition(), attacker->getRange());
+    }
+
+    if (!inRange) {
+        std::cout << "L'attaque échoue : cible hors de portée." << std::endl;
         return;
     }
 
@@ -243,10 +278,20 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     attacker->applyOffensiveAbility(defender, additionalAttackBonus);
 
     int additionalDefenseBonus = 0;
-    defender->applyDefensiveAbility(this, additionalDefenseBonus);
+    defender->applyDefensiveAbility(this, attacker, additionalDefenseBonus);
 
-    int totalAttack = attackRoll + attacker->getAttackBonus() + additionalAttackBonus;
-    int totalDefense = defenseRoll + defender->getDefenseBonus() + additionalDefenseBonus;
+    // Heracles Check: Resistant
+    int oppDefBonus = defender->getDefenseBonus();
+    int oppAtkBonus = attacker->getAttackBonus();
+    if (attacker->getAbility() == "Resistant" || attacker->getAbility() == "Résistant") {
+        oppDefBonus = 0;
+    }
+    if (defender->getAbility() == "Resistant" || defender->getAbility() == "Résistant") {
+        oppAtkBonus = 0;
+    }
+
+    int totalAttack = attackRoll + oppAtkBonus + additionalAttackBonus;
+    int totalDefense = defenseRoll + oppDefBonus + additionalDefenseBonus;
 
     int damage = totalAttack - totalDefense;
     if (damage < 0) damage = 0;

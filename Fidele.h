@@ -72,7 +72,10 @@ public:
 
     // Apply special ability logic modifying combat stats
     void applyOffensiveAbility(Fidele* target, int& additionalAttackBonus) const;
-    void applyDefensiveAbility(class Board* board, int& additionalDefenseBonus) const;
+    void applyDefensiveAbility(class Board* board, Fidele* attacker, int& additionalDefenseBonus) const;
+
+    bool getSkipNextAttack() const { return skipNextAttack; }
+    void setSkipNextAttack(bool skip) { skipNextAttack = skip; }
 
     Position getPosition() const { return currentPosition; }
     void setPosition(Position pos) { currentPosition = pos; }
@@ -106,4 +109,5 @@ public:
     bool alive;
     Position currentPosition;
     Position deathPosition;
+    bool skipNextAttack = false;
 };

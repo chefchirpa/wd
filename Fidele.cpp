@@ -2,8 +2,8 @@
 #include "Board.h"
 #include <iostream>
 
-void Fidele::applyDefensiveAbility(Board* board, int& additionalDefenseBonus) const {
-    if (!board) return;
+void Fidele::applyDefensiveAbility(Board* board, Fidele* attacker, int& additionalDefenseBonus) const {
+    if (!board || !attacker) return;
 
     if (abilityEn == "Phalanx" || abilityEn == "Support" || abilityFr == "Phalange" || abilityFr == "Soutien") {
         Position myPos = this->getPosition();
@@ -29,6 +29,30 @@ void Fidele::applyDefensiveAbility(Board* board, int& additionalDefenseBonus) co
 
             // Output string using the French Name constraint from user
             std::cout << "Pouvoir " << abilityFr << " activé : +" << allyCount << " bonus de défense grâce aux alliés adjacents.\n";
+        }
+    }
+
+    if (abilityEn == "Heel" || abilityFr == "Talon") {
+        Position myPos = this->getPosition();
+        Position attPos = attacker->getPosition();
+
+        bool isBehind = false;
+        // P1 faces Down (+x). "Behind" means the attacker is at a smaller x.
+        // P2 faces Up (-x). "Behind" means the attacker is at a larger x.
+        if (this->getOwner() == Player::Player1 && attPos.x < myPos.x) {
+            isBehind = true;
+        } else if (this->getOwner() == Player::Player2 && attPos.x > myPos.x) {
+            isBehind = true;
+        }
+
+        if (!isBehind) {
+            additionalDefenseBonus += 1;
+            Language prevLang = currentLanguage;
+            currentLanguage = Language::French;
+            std::cout << "\n>>> POUVOIR ACTIVÉ : " << this->getName() << " - " << this->getAbility() << " <<<\n";
+            std::cout << "Effet : " << this->getDescription() << "\n";
+            std::cout << "-> +1 Bonus de Défense accordé.\n\n";
+            currentLanguage = prevLang;
         }
     }
 }
