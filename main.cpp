@@ -232,42 +232,26 @@ int main() {
         return 1;
     }
 
-    // Find "Cyclope" in the loaded fideles
+    // Find "Cyclope" and "Achille" in the loaded fideles
     Fidele* cyclopePtr = nullptr;
+    Fidele* achillePtr = nullptr;
     for (auto& f : fideles) {
-        if (f.getName() == "Cyclope") {
-            cyclopePtr = &f;
-            break;
-        }
+        if (f.getName() == "Cyclope") cyclopePtr = &f;
+        if (f.getName() == "Achille") achillePtr = &f;
     }
 
-    if (!cyclopePtr) {
-        std::cerr << "Could not find Cyclope in the CSV." << std::endl;
+    if (!cyclopePtr || !achillePtr) {
+        std::cerr << "Could not find Cyclope or Achille in the CSV." << std::endl;
         return 1;
     }
 
     // Cyclops is Roman. Let's place him for Player 2 (Pantheon)
-    Position p2StartPos = {10, 4}; // Row 10 is within the first 3 rows from P2's side (9, 10, 11)
+    Position p2StartPos = {10, 4};
+    board.placeInitialFidele(cyclopePtr, p2StartPos, Player::Player2);
 
-    if (board.placeInitialFidele(cyclopePtr, p2StartPos, Player::Player2)) {
-        std::cout << "Successfully placed " << cyclopePtr->getName() << " at (" << p2StartPos.x << "," << p2StartPos.y << ")" << std::endl;
-    } else {
-        std::cout << "Failed to place " << cyclopePtr->getName() << std::endl;
-    }
-
-    // Let's add an enemy Greek unit just for fun to see both tags
-    Fidele* heroPtr = nullptr;
-    for (auto& f : fideles) {
-        if (f.getFaction() == Faction::Greek && f.getType() == FideleType::Heros) {
-            heroPtr = &f;
-            break;
-        }
-    }
-
-    if (heroPtr) {
-        Position p1StartPos = {2, 4}; // Row 2 is within the first 3 rows from P1's side (0, 1, 2)
-        board.placeInitialFidele(heroPtr, p1StartPos, Player::Player1);
-    }
+    // Achille is Greek. Let's place him for Player 1 (Olympe)
+    Position p1StartPos = {2, 4};
+    board.placeInitialFidele(achillePtr, p1StartPos, Player::Player1);
 
     // Display the initial board
     std::cout << "\n[Initial Board State]\n";
@@ -275,28 +259,9 @@ int main() {
 
     // Test interactive movement commands
     std::cout << "\n--- Testing Interactive Movement ---\n";
-
-    // Cyclope has Up: 3, Down: 1, Left: 2, Right: 2
-    std::cout << "Command: Move Cyclope Up 2\n";
-    if (board.moveUnit(cyclopePtr, "Up", 2)) {
-        std::cout << "-> Cyclope moved successfully!\n";
-    } else {
-        std::cout << "-> Invalid move.\n";
-    }
-
-    std::cout << "Command: Move Cyclope Right 1\n";
-    if (board.moveUnit(cyclopePtr, "Right", 1)) {
-        std::cout << "-> Cyclope moved successfully!\n";
-    } else {
-        std::cout << "-> Invalid move.\n";
-    }
-
-    // Attempt invalid movement exceeding stats (Down 2 instead of max 1)
-    std::cout << "Command: Move Cyclope Down 2 (Exceeds stat limits)\n";
-    if (board.moveUnit(cyclopePtr, "Down", 2)) {
-        std::cout << "-> Cyclope moved successfully!\n";
-    } else {
-        std::cout << "-> Invalid move successfully blocked.\n";
+    std::cout << "Command: Move Achille Down 2\n";
+    if (board.moveUnit(achillePtr, "Down", 2)) {
+        std::cout << "-> Achille moved successfully to (" << achillePtr->getPosition().x << "," << achillePtr->getPosition().y << ")!\n";
     }
 
     // Display the simulated visual board after moves
@@ -305,15 +270,15 @@ int main() {
 
     // --- Testing ATTACK command ---
     std::cout << "\n--- Testing ATTACK command ---\n";
-    // Ulysse is at (2, 4) and Cyclope is at (8, 3) -> Out of range.
-    // Let's teleport Cyclope in range to demonstrate a successful ATTACK command
-    board.removeFideleFromGrid(cyclopePtr);
-    Position combatPos = {2, 3}; // Adjacent to Ulysse at (2,4)
-    board.placeFidele(cyclopePtr, combatPos);
-    std::cout << "[Teleported Cyclope to (2,3) to be in range of Ulysse at (2,4)]\n";
 
-    // We will simulate the input: ATTACK Cyclope Ulysse
-    std::string command = "ATTACK Cyclope Ulysse";
+    // Achille range is 2. Let's teleport Cyclope in range.
+    board.removeFideleFromGrid(cyclopePtr);
+    Position combatPos = {achillePtr->getPosition().x + 1, achillePtr->getPosition().y};
+    board.placeFidele(cyclopePtr, combatPos);
+    std::cout << "[Teleported Cyclope to be adjacent to Achille for combat]\n";
+
+    // Simulate Achille attacking Cyclope
+    std::string command = "ATTACK Achille Cyclope";
     std::cout << "Command received: " << command << "\n";
 
     // Simple mock parser
