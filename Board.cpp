@@ -171,7 +171,9 @@ Domaine* Board::getDomaine(Player player) {
 }
 
 int Board::rollDice() const {
-    return (std::rand() % 6) + 1;
+    static const int dieFaces[10] = {0, 1, 1, 2, 2, 3, 3, 4, 4, 5};
+    int index = std::rand() % 10;
+    return dieFaces[index];
 }
 
 bool Board::isInRange(Position p1, Position p2, int range) const {
