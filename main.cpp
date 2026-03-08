@@ -587,6 +587,65 @@ int main(int argc, char* argv[]) {
     std::cout << "Command received: ATTACK Achille Soldat romain\n";
     board.attackFidele(achillePtr, &romanSoldier);
 
+    // Test 3: Mermaid (Chant) Attraction (Triggered via Move)
+    std::cout << "\n>> Testing Mermaid (Chant) Attraction (End of Move trigger)\n";
+    Fidele* sirenePtr = nullptr;
+    for (auto& f : fideles) {
+        if (f.getName() == "Sirène" || f.getName() == "Mermaid") sirenePtr = &f;
+    }
+    if (sirenePtr) {
+        sirenePtr->setOwner(Player::Player1);
+        sirenePtr->setAlive(true);
+        board.placeFidele(sirenePtr, {7, 5}); // Place below the Roman cluster
+        std::cout << "Placed Sirène at (7,5), Range: " << sirenePtr->getRange() << "\n";
+
+        // Target is romanSoldier at (5,5). Distance is 2. Range of Mermaid is 3.
+        // We will move Mermaid "Up" 1 to (6,5) and her power should trigger automatically at end of move.
+        std::cout << "Command received: Move Sirène Up 1\n";
+        board.moveUnit(sirenePtr, "Up", 1);
+    }
+
+    // Test 4: Chimera Deflagration & Ceryneian Hind Elusive & Cerberus Block
+    std::cout << "\n>> Testing Chimera (Splash), Hind (Elusive) & Cerberus (Block)\n";
+    Fidele* chimerePtr = nullptr;
+    Fidele* bichePtr = nullptr;
+    Fidele* cerberePtr = nullptr;
+    for (auto& f : fideles) {
+        if (f.getName() == "Chimère" || f.getName() == "Chimera") chimerePtr = &f;
+        if (f.getName() == "Biche de Cérynie" || f.getName() == "Ceryneian Hind") bichePtr = &f;
+        if (f.getName() == "Cerbère" || f.getName() == "Cerberus") cerberePtr = &f;
+    }
+
+    if (chimerePtr && bichePtr && cerberePtr) {
+        chimerePtr->setOwner(Player::Player1);
+        chimerePtr->setAlive(true);
+        bichePtr->setOwner(Player::Player2);
+        bichePtr->setAlive(true);
+        cerberePtr->setOwner(Player::Player1);
+        cerberePtr->setAlive(true);
+
+        board.placeFidele(chimerePtr, {0, 0});
+        board.placeFidele(bichePtr, {0, 1}); // Same tile
+
+        // Add a random victim to the same tile to take splash damage
+        Fidele victim = fideles[4]; victim.setOwner(Player::Player2); victim.setAlive(true);
+        board.placeFidele(&victim, {1, 0}); // Same tile (0-2 x 0-2)
+
+        std::cout << "Command received: ATTACK Chimère Biche de Cérynie\n";
+        board.attackFidele(chimerePtr, bichePtr);
+
+        // Let's manually kill the victim to test Cerberus blocking its respawn on this tile
+        std::cout << "\n[Manually killing victim at (1,0) to test Cerberus block]\n";
+        board.killFidele(&victim);
+
+        // Move Cerberus onto this tile (e.g. {1, 1})
+        board.placeFidele(cerberePtr, {1, 1});
+
+        std::cout << "\nCommand received: RESURRECT Victim at (1,0)\n";
+        // Attempt to resurrect victim on its death pos {1,0}, which is on the same tile as Cerberus {1,1}
+        board.resurrectFidele(&victim);
+    }
+
     // --- Testing PLAY_GOD command ---
     std::cout << "\n--- Testing PLAY_GOD command ---\n";
 

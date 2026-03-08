@@ -28,6 +28,13 @@ Fidele* Board::getFideleAt(Position pos) const {
     return grid[pos.x][pos.y];
 }
 
+bool Board::isSameTile(Position p1, Position p2) const {
+    // The board is made of 3x3 tiles.
+    // Row 0, 1, 2 are Tile Row 0 (x/3 == 0).
+    // Col 0, 1, 2 are Tile Col 0 (y/3 == 0).
+    return (p1.x / 3 == p2.x / 3) && (p1.y / 3 == p2.y / 3);
+}
+
 bool Board::placeFidele(Fidele* fidele, Position pos) {
     if (!fidele || !isWithinBounds(pos) || isOccupied(pos)) {
         return false;
@@ -98,6 +105,31 @@ bool Board::moveUnit(Fidele* fidele, const std::string& direction, int distance)
     bool success = moveFidele(fidele, path);
     if (!success) {
         std::cout << "Action impossible : ce déplacement n'est pas autorisé par les cieux." << std::endl;
+    } else {
+        // Trigger: Mermaid Song Check "At the end of a MOVE action"
+        if (fidele->getAbility() == "Song" || fidele->getAbility() == "Chant") {
+            // Check if any enemy is in range
+            Fidele* validTarget = nullptr;
+            for (int i = 0; i < LENGTH; ++i) {
+                for (int j = 0; j < WIDTH; ++j) {
+                    Fidele* occ = grid[i][j];
+                    if (occ && occ->isAlive() && occ->getOwner() != fidele->getOwner() && isInRange(fidele->getPosition(), occ->getPosition(), fidele->getRange())) {
+                        validTarget = occ;
+                        break;
+                    }
+                }
+                if (validTarget) break;
+            }
+
+            if (validTarget) {
+                // Interactive prompt logic. For automated testing, we simulate picking 'Y'.
+                std::cout << "\n[PROMPT] " << fidele->getName() << " a fini son déplacement. Un ennemi (" << validTarget->getName() << ") est à portée.\n";
+                std::cout << "Utiliser le Chant de la Sirène au lieu d'attaquer ? (O/N) : O (Simulé)\n";
+
+                // Trigger the ability
+                useMermaidSong(fidele, validTarget);
+            }
+        }
     }
     return success;
 }
@@ -240,8 +272,93 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
                 }
             }
         }
+
+        // Ceryneian Hind Elusiveness Check
+        if (defender->isAlive() && (defender->getAbility() == "Elusive" || defender->getAbility() == "Insaisissable")) {
+            Language prevLang = Fidele::currentLanguage;
+            Fidele::currentLanguage = Language::French;
+            std::cout << "\n>>> POUVOIR ACTIVÉ : " << defender->getName() << " - " << defender->getAbility() << " <<<\n";
+            std::cout << "Effet : " << defender->getDescription() << "\n";
+            std::cout << "-> Action accordée : Déplacement gratuit pour " << defender->getName() << " !\n";
+            Fidele::currentLanguage = prevLang;
+
+            // Execute the free move immediately. In an interactive console game, this would loop via std::cin.
+            // For testing, we will simulate a backward dash of 1 if permitted by its stats.
+            std::string escapeDir = (defender->getOwner() == Player::Player1) ? "Down" : "Up"; // Move away
+            std::cout << "[PROMPT] Entrez la direction de fuite (Up, Down, Left, Right) et la distance : " << escapeDir << " 1 (Simulé)\n";
+            bool escapeSuccess = moveUnit(defender, escapeDir, 1);
+            if (!escapeSuccess) {
+                // If backward is blocked, try side
+                escapeSuccess = moveUnit(defender, "Left", 1);
+            }
+            if (escapeSuccess) {
+                std::cout << "-> " << defender->getName() << " a fui vers la case (" << defender->getPosition().x << "," << defender->getPosition().y << ") !\n\n";
+            } else {
+                std::cout << "-> La fuite a échoué (chemin bloqué).\n\n";
+            }
+        }
+
+        // Chimera Deflagration Check
+        if (attacker->getAbility() == "Deflagration" || attacker->getAbility() == "Déflagration") {
+            Language prevLang = Fidele::currentLanguage;
+            Fidele::currentLanguage = Language::French;
+            std::cout << "\n>>> POUVOIR ACTIVÉ : " << attacker->getName() << " - " << attacker->getAbility() << " <<<\n";
+            std::cout << "Effet : " << attacker->getDescription() << "\n";
+            Fidele::currentLanguage = prevLang;
+
+            Position targetPos = defender->getPosition();
+
+            // Apply 1 damage to all OTHER enemies on the SAME TILE
+            for (int i = 0; i < LENGTH; ++i) {
+                for (int j = 0; j < WIDTH; ++j) {
+                    Fidele* occ = grid[i][j];
+                    if (occ && occ->isAlive() && occ != defender && occ->getOwner() == defender->getOwner()) {
+                        if (isSameTile(occ->getPosition(), targetPos)) {
+                            std::cout << "-> " << occ->getName() << " subit 1 dégât de brûlure !\n";
+                            occ->takeDamage(1);
+
+                            if (occ->getCurrentHP() <= 0) {
+                                killFidele(occ);
+                                std::string dName = (occ->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+                                std::cout << "-> " << occ->getName() << " a succombé aux brûlures ! Le domaine " << dName << " perd 1 PV.\n";
+                                Domaine* dom = getDomaine(occ->getOwner());
+                                if (dom) {
+                                    dom->takeDamage(1);
+                                    if (dom->getHP() <= 0) {
+                                        std::cout << "\n*** VICTOIRE ! ***\nLe domaine " << dName << " a été détruit. Fin de la guerre !\n";
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            std::cout << "\n";
+        }
     } else {
         std::cout << "L'attaque échoue ! " << defender->getName() << " bloque le coup sans subir de dégâts." << std::endl;
+
+        // Ceryneian Hind Elusiveness Check (still triggers if attack misses, as per "after being targeted")
+        if (defender->isAlive() && (defender->getAbility() == "Elusive" || defender->getAbility() == "Insaisissable")) {
+            Language prevLang = Fidele::currentLanguage;
+            Fidele::currentLanguage = Language::French;
+            std::cout << "\n>>> POUVOIR ACTIVÉ : " << defender->getName() << " - " << defender->getAbility() << " <<<\n";
+            std::cout << "Effet : " << defender->getDescription() << "\n";
+            std::cout << "-> Action accordée : Déplacement gratuit pour " << defender->getName() << " !\n";
+            Fidele::currentLanguage = prevLang;
+
+            std::string escapeDir = (defender->getOwner() == Player::Player1) ? "Down" : "Up"; // Move away
+            std::cout << "[PROMPT] Entrez la direction de fuite (Up, Down, Left, Right) et la distance : " << escapeDir << " 1 (Simulé)\n";
+            bool escapeSuccess = moveUnit(defender, escapeDir, 1);
+            if (!escapeSuccess) {
+                escapeSuccess = moveUnit(defender, "Left", 1);
+            }
+            if (escapeSuccess) {
+                std::cout << "-> " << defender->getName() << " a fui vers la case (" << defender->getPosition().x << "," << defender->getPosition().y << ") !\n\n";
+            } else {
+                std::cout << "-> La fuite a échoué (chemin bloqué).\n\n";
+            }
+        }
     }
 }
 
@@ -285,6 +402,67 @@ void Board::attackDomaine(Fidele* attacker, Domaine* targetDomaine) {
     }
 }
 
+void Board::useMermaidSong(Fidele* mermaid, Fidele* target) {
+    if (!mermaid || !target || !mermaid->isAlive() || !target->isAlive()) return;
+    if (mermaid->getAbility() != "Song" && mermaid->getAbility() != "Chant") return;
+
+    if (!isInRange(mermaid->getPosition(), target->getPosition(), mermaid->getRange())) {
+        std::cout << "Le chant de la Sirène échoue : cible hors de portée." << std::endl;
+        return;
+    }
+
+    Language prevLang = Fidele::currentLanguage;
+    Fidele::currentLanguage = Language::French;
+    std::cout << "\n>>> POUVOIR ACTIVÉ : " << mermaid->getName() << " - " << mermaid->getAbility() << " <<<\n";
+    std::cout << "Effet : " << mermaid->getDescription() << "\n";
+    Fidele::currentLanguage = prevLang;
+
+    Position mPos = mermaid->getPosition();
+    Position tPos = target->getPosition();
+    Position newPos = tPos;
+
+    // Pull 1 square closer
+    if (mPos.x == tPos.x) {
+        if (tPos.y > mPos.y) newPos.y -= 1;
+        else if (tPos.y < mPos.y) newPos.y += 1;
+    } else if (mPos.y == tPos.y) {
+        if (tPos.x > mPos.x) newPos.x -= 1;
+        else if (tPos.x < mPos.x) newPos.x += 1;
+    }
+
+    if (!isOccupied(newPos)) {
+        // Move the target
+        grid[tPos.x][tPos.y] = nullptr;
+        grid[newPos.x][newPos.y] = target;
+        target->setPosition(newPos);
+        std::cout << "-> " << target->getName() << " est attiré(e) en (" << newPos.x << "," << newPos.y << ").\n";
+
+        // Check if now adjacent (distance == 1)
+        int dist = std::abs(mPos.x - newPos.x) + std::abs(mPos.y - newPos.y);
+        if (dist == 1) {
+            std::cout << "-> " << target->getName() << " finit adjacent(e) à la Sirène et subit 2 points de dégâts purs !\n";
+            target->takeDamage(2);
+
+            if (target->getCurrentHP() <= 0) {
+                killFidele(target);
+                Domaine* defenderDomaine = getDomaine(target->getOwner());
+                std::string domainName = (target->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+                std::cout << target->getName() << " est tombé au combat ! Le domaine " << domainName << " perd 1 PV." << std::endl;
+                if (defenderDomaine) {
+                    defenderDomaine->takeDamage(1);
+                    if (defenderDomaine->getHP() <= 0) {
+                        std::cout << "\n*** VICTOIRE ! ***\nLe domaine " << domainName << " a été détruit. Fin de la guerre !\n";
+                    }
+                }
+            } else {
+                std::cout << "PV restants de " << target->getName() << " : " << target->getCurrentHP() << ".\n";
+            }
+        }
+    } else {
+        std::cout << "-> L'attraction échoue car la case de destination est bloquée.\n";
+    }
+}
+
 bool Board::killFidele(Fidele* fidele) {
     if (!fidele || !fidele->isAlive()) {
         return false;
@@ -304,6 +482,26 @@ bool Board::resurrectFidele(Fidele* fidele) {
     }
 
     Position deathPos = fidele->getDeathPosition();
+
+    // Cerberus check: "Gardien des enfers"
+    for (int i = 0; i < LENGTH; ++i) {
+        for (int j = 0; j < WIDTH; ++j) {
+            Fidele* occ = grid[i][j];
+            if (occ && occ->isAlive() && occ->getOwner() != fidele->getOwner()) {
+                if (occ->getAbility() == "Guardian of the underworld" || occ->getAbility() == "Gardien des enfers") {
+                    if (isSameTile(occ->getPosition(), deathPos)) {
+                        Language prevLang = Fidele::currentLanguage;
+                        Fidele::currentLanguage = Language::French;
+                        std::cout << "\n>>> POUVOIR ACTIVÉ : " << occ->getName() << " - " << occ->getAbility() << " <<<\n";
+                        std::cout << "Effet : " << occ->getDescription() << "\n";
+                        std::cout << "-> Résurrection de " << fidele->getName() << " annulée !\n\n";
+                        Fidele::currentLanguage = prevLang;
+                        return false;
+                    }
+                }
+            }
+        }
+    }
 
     // Check if death position is still occupied by something else
     // Since the dead token stays on the board, if grid[x][y] == fidele, it means it's just reviving itself.
