@@ -42,3 +42,30 @@ struct PlayerState {
     std::vector<God*> gods;
     Player playerId;
 };
+
+class Domaine;
+
+struct TurnModifiers {
+    bool aresDoubleDamage = false;
+    bool vulcanDoubleDice = false;
+    Player activeGodPlayer = Player::None; // The player who cast the turn-wide God
+
+    bool neptuneNullifyEnemyAbilities = false;
+
+    std::vector<Fidele*> minervaImmuneFideles;
+    std::vector<Domaine*> minervaImmuneDomaines;
+
+    std::vector<std::pair<Fidele*, Player>> dionysusMindControlled; // <Target, OriginalOwner>
+
+    void reset() {
+        aresDoubleDamage = false;
+        vulcanDoubleDice = false;
+        activeGodPlayer = Player::None;
+        neptuneNullifyEnemyAbilities = false;
+        minervaImmuneFideles.clear();
+        minervaImmuneDomaines.clear();
+
+        // (Note: Restore ownership logic is now handled in Board.cpp or main.cpp since Fidele is incomplete here)
+        dionysusMindControlled.clear();
+    }
+};

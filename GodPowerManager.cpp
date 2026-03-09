@@ -26,70 +26,154 @@ bool GodPowerManager::playGod(God* god, PlayerState& owner, Board& board, Player
     bool success = false;
     std::string baseAbility = god->getAbility(); // E.g., "Lightning" or "Eclairs"
 
-    // Example - Zeus (Éclairs)
-    if (god->getName() == "Zeus" || baseAbility.find("clair") != std::string::npos || baseAbility.find("Lightning") != std::string::npos) {
-        // Target an enemy unit and subtract 5 HP
+    std::string gName = god->getName();
+
+    // GREEK GODS
+    if (gName == "Zeus" || baseAbility.find("clair") != std::string::npos || baseAbility.find("Lightning") != std::string::npos) {
+        // Target format for Zeus in simulation: "TargetName" (simulated dealing all 4 to one target for simplicity)
         Fidele* target = nullptr;
         for (auto& f : allFideles) {
-            if (f.getName() == targetName && f.isAlive() && f.getPosition().x != -1) {
-                target = &f;
-                break;
-            }
+            if (f.getName() == targetName && f.isAlive() && f.getPosition().x != -1) { target = &f; break; }
         }
 
         if (target && target->isImmuneToAbilities()) {
             std::cout << target->getName() << " (Géant) est immunisé contre les pouvoirs des Dieux !\n";
             success = false;
         } else if (target) {
-            std::cout << "Zeus strikes " << target->getName() << " for 5 damage!\n";
-            target->takeDamage(5);
+            std::cout << "Zeus foudroie " << target->getName() << " et inflige 4 dégâts purs !\n";
+            target->takeDamage(4);
             if (target->getCurrentHP() <= 0) {
-                std::cout << target->getName() << " was obliterated by Zeus!\n";
+                std::cout << target->getName() << " a été pulvérisé par Zeus !\n";
                 board.killFidele(target);
-
                 Domaine* enemyDom = board.getDomaine(target->getOwner());
                 if (enemyDom) {
                     enemyDom->takeDamage(1);
-                    std::cout << "Enemy Domain loses 1 HP. Current HP: " << enemyDom->getHP() << "\n";
+                    std::cout << "Le domaine ennemi perd 1 PV. HP restants: " << enemyDom->getHP() << "\n";
                 }
             }
             success = true;
-        } else {
-            std::cout << "Zeus's strike failed: Target '" << targetName << "' not found or not alive on the board.\n";
         }
     }
-    // Example - Hades (Rappel / Underworld)
-    else if (god->getName() == "Hades" || god->getName() == "Hadès" || baseAbility.find("Rappel") != std::string::npos || baseAbility.find("Recall") != std::string::npos) {
-        // Take a dead unit from the player's deck and resurrect it immediately
-        Fidele* target = nullptr;
-
-        // Search owner's deck for a dead unit matching the name
-        auto it = owner.deck.begin();
-        while (it != owner.deck.end()) {
-            if ((*it)->getName() == targetName && !(*it)->isAlive()) {
-                target = *it;
-                owner.deck.erase(it); // Remove from deck
-                break;
+    else if (gName == "Hermès" || gName == "Hermes") {
+        std::cout << "-> Hermès accorde un déplacement gratuit à TOUS les alliés !\n";
+        for (auto& f : allFideles) {
+            if (f.isAlive() && f.getOwner() == owner.playerId && f.getPosition().x != -1) {
+                std::cout << "[PROMPT] Déplacement gratuit pour " << f.getName() << " (Simulé : Left 1)\n";
+                board.moveUnit(&f, "Left", 1);
             }
-            ++it;
         }
+        success = true;
+    }
+    else if (gName == "Hadès" || gName == "Hades") {
+        std::cout << "-> Hadès autorise une seconde invocation (simulée ici depuis la main)\n";
+        if (!owner.hand.empty()) {
+            Fidele* extra = owner.hand.front();
+            owner.hand.erase(owner.hand.begin());
 
-        if (target) {
-            std::cout << "Hades summons " << target->getName() << " from the underworld!\n";
-            bool resurrected = board.resurrectFidele(target);
-            if (resurrected) {
-                std::cout << target->getName() << " successfully resurrected at its death position.\n";
+            Position startPos = board.getFirstEmptyStartRow(owner.playerId);
+            if (startPos.x != -1) {
+                board.placeNewFidele(extra, startPos, owner.playerId);
+                std::cout << "-> " << extra->getName() << " invoqué via Hadès en (" << startPos.x << "," << startPos.y << ")\n";
                 success = true;
-            } else {
-                std::cout << "Failed to resurrect " << target->getName() << ". Position might be blocked.\n";
-                // Put back in deck if failed
-                owner.deck.push_back(target);
             }
-        } else {
-            std::cout << "Hades's power failed: Dead target '" << targetName << "' not found in deck.\n";
+
+            // Draw 1 card to maintain hand size
+            if (!owner.deck.empty()) {
+                owner.hand.push_back(owner.deck.front());
+                owner.deck.pop_front();
+                std::cout << "-> Pioche 1 carte pour compenser l'invocation d'Hadès.\n";
+            }
         }
-    } else {
-        std::cout << "This God's specific power logic is not yet hardcoded. Marking as played.\n";
+    }
+    else if (gName == "Dyonysos" || gName == "Dionysus") {
+        std::cout << "-> Dionysos rend ivres les ennemis ! (Simulation: On prend le contrôle d'une cible ennemie pour ce tour)\n";
+        Fidele* target = nullptr;
+        for (auto& f : allFideles) {
+            if (f.getName() == targetName && f.isAlive() && f.getOwner() != owner.playerId && f.getPosition().x != -1) {
+                target = &f; break;
+            }
+        }
+        if (target && !target->isImmuneToAbilities()) {
+            board.turnMods.dionysusMindControlled.push_back({target, target->getOwner()});
+            target->setOwner(owner.playerId); // Temporarily steal control
+            std::cout << "-> Vous contrôlez " << target->getName() << " jusqu'à la fin du tour !\n";
+            success = true;
+        } else if (target && target->isImmuneToAbilities()) {
+            std::cout << "-> " << target->getName() << " (Géant) est immunisé à l'ivresse !\n";
+        }
+    }
+    else if (gName == "Arès" || gName == "Ares") {
+        std::cout << "-> L'aura d'Arès double vos dégâts pour ce tour !\n";
+        board.turnMods.aresDoubleDamage = true;
+        board.turnMods.activeGodPlayer = owner.playerId;
+        success = true;
+    }
+
+    // ROMAN GODS
+    else if (gName == "Diane" || gName == "Diana") {
+        std::cout << "-> Les flèches d'argent de Diane repoussent tous les ennemis de 4 cases !\n";
+        std::string pushDir = (owner.playerId == Player::Player1) ? "Down" : "Up"; // Push them away
+        for (auto& f : allFideles) {
+            if (f.isAlive() && f.getOwner() != owner.playerId && f.getPosition().x != -1) {
+                if (f.isImmuneToAbilities()) {
+                    std::cout << "-> " << f.getName() << " (Géant) encaisse la flèche sans bouger.\n";
+                    continue;
+                }
+                std::cout << "-> " << f.getName() << " est repoussé de 4 cases !\n";
+                // Simulate pushing
+                bool pushed = board.moveUnit(&f, pushDir, 4);
+                if (!pushed) {
+                    std::cout << "   Chemin bloqué, esquive latérale...\n";
+                    board.moveUnit(&f, "Left", 1);
+                }
+            }
+        }
+        success = true;
+    }
+    else if (gName == "Vulcain" || gName == "Vulcan") {
+        std::cout << "-> Vulcain fournit des munitions lourdes (2 dés, garde le meilleur) pour ce tour !\n";
+        board.turnMods.vulcanDoubleDice = true;
+        board.turnMods.activeGodPlayer = owner.playerId;
+        success = true;
+    }
+    else if (gName == "Pluton" || gName == "Pluto") {
+        std::cout << "-> Pluton envoie une âme dans le Tartare pour l'éternité !\n";
+        Fidele* target = nullptr;
+        for (auto& f : allFideles) {
+            if (f.getName() == targetName && f.getOwner() != owner.playerId && (!f.isAlive() || f.getCurrentHP() < f.getHP())) {
+                target = &f; break;
+            }
+        }
+        if (target) {
+            std::cout << "-> " << target->getName() << " est banni définitivement du jeu !\n";
+            board.removeFideleFromGrid(target);
+            target->setAlive(false);
+            target->setHP(0);
+            target->setDeathPosition({-1,-1}); // Erase death pos so cannot be resurrected
+            success = true;
+        } else {
+            std::cout << "Cible introuvable ou n'est pas blessée/morte.\n";
+        }
+    }
+    else if (gName == "Minerve" || gName == "Minerva") {
+        std::cout << "-> L'Égide de Minerve protège 3 entités pour le tour !\n";
+        // Simulate protecting the Domain and 2 specific allies
+        board.turnMods.minervaImmuneDomaines.push_back(board.getDomaine(owner.playerId));
+        int count = 0;
+        for (auto& f : allFideles) {
+            if (f.isAlive() && f.getOwner() == owner.playerId && f.getPosition().x != -1) {
+                board.turnMods.minervaImmuneFideles.push_back(&f);
+                std::cout << "   " << f.getName() << " est protégé par l'Égide.\n";
+                count++;
+                if (count >= 2) break; // 1 Domain + 2 Units = 3 targets
+            }
+        }
+        success = true;
+    }
+    else if (gName == "Neptune") {
+        std::cout << "-> Le Typhon de Neptune désactive tous les pouvoirs ennemis pour ce tour !\n";
+        board.turnMods.neptuneNullifyEnemyAbilities = true;
+        board.turnMods.activeGodPlayer = owner.playerId;
         success = true;
     }
 

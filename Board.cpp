@@ -69,6 +69,15 @@ bool Board::moveFidele(Fidele* fidele, const std::vector<Position>& path) {
     return true;
 }
 
+void Board::resetTurnModifiers() {
+    for (auto& pair : turnMods.dionysusMindControlled) {
+        if (pair.first) {
+            pair.first->setOwner(pair.second);
+        }
+    }
+    turnMods.reset();
+}
+
 bool Board::moveUnit(Fidele* fidele, const std::string& direction, int distance) {
     if (!fidele || !fidele->isAlive() || distance <= 0) {
         return false;
@@ -314,21 +323,45 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
         return;
     }
 
+    // Minerva Immunity Check
+    for (Fidele* f : turnMods.minervaImmuneFideles) {
+        if (f == defender) {
+            std::cout << "-> " << defender->getName() << " est protégé par l'Égide de Minerve et ne peut être blessé ce tour !\n";
+            return;
+        }
+    }
+
     int attackRoll = rollDice();
-    if (attacker->getAbility() == "Overpower" || attacker->getAbility() == "Surpuissance") {
+    if ((attacker->getAbility() == "Overpower" || attacker->getAbility() == "Surpuissance") &&
+        !(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != attacker->getOwner())) {
         int roll2 = rollDice();
         attackRoll = std::max(attackRoll, roll2);
         AbilityController::printAbilityTrigger(attacker);
         std::cout << "-> Hercule garde le meilleur jet : " << attackRoll << " !\n";
     }
 
+    if (turnMods.vulcanDoubleDice && turnMods.activeGodPlayer == attacker->getOwner()) {
+        int roll2 = rollDice();
+        attackRoll = std::max(attackRoll, roll2);
+        std::cout << "-> Vulcain offre un 2e jet d'attaque ! (" << attackRoll << " retenu)\n";
+    }
+
     int defenseRoll = rollDice();
+    if (turnMods.vulcanDoubleDice && turnMods.activeGodPlayer == defender->getOwner()) {
+        int roll2 = rollDice();
+        defenseRoll = std::max(defenseRoll, roll2);
+        std::cout << "-> Vulcain offre un 2e jet de défense ! (" << defenseRoll << " retenu)\n";
+    }
 
     int additionalAttackBonus = 0;
-    attacker->applyOffensiveAbility(defender, additionalAttackBonus);
+    if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != attacker->getOwner())) {
+        attacker->applyOffensiveAbility(defender, additionalAttackBonus);
+    }
 
     int additionalDefenseBonus = 0;
-    defender->applyDefensiveAbility(this, attacker, additionalDefenseBonus);
+    if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != defender->getOwner())) {
+        defender->applyDefensiveAbility(this, attacker, additionalDefenseBonus);
+    }
 
     // Heracles Check: Resistant
     int oppDefBonus = defender->getDefenseBonus();
@@ -344,13 +377,13 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     int totalDefense = defenseRoll + oppDefBonus + additionalDefenseBonus;
 
     // Cupid Check: Charm (-1 to opponent's die result, simulated by deducting 1 from total before damage if possible, or modifying raw stat)
-    if (attacker->getAbility() == "Charm" || attacker->getAbility() == "Charme") {
+    if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != attacker->getOwner()) && (attacker->getAbility() == "Charm" || attacker->getAbility() == "Charme")) {
         totalDefense -= 1;
         if (totalDefense < 0) totalDefense = 0;
         AbilityController::printAbilityTrigger(attacker);
         std::cout << "-> Charme actif : Défense réduite à " << totalDefense << " !\n";
     }
-    if (defender->getAbility() == "Charm" || defender->getAbility() == "Charme") {
+    if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != defender->getOwner()) && (defender->getAbility() == "Charm" || defender->getAbility() == "Charme")) {
         totalAttack -= 1;
         if (totalAttack < 0) totalAttack = 0;
         AbilityController::printAbilityTrigger(defender);
@@ -360,8 +393,13 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     int damage = totalAttack - totalDefense;
     if (damage < 0) damage = 0;
 
+    if (turnMods.aresDoubleDamage && turnMods.activeGodPlayer == attacker->getOwner()) {
+        damage *= 2;
+        std::cout << "-> Arès double les dégâts infligés (" << damage << ") !\n";
+    }
+
     // Lemures Check: Coup de grace (Immune to exactly 1 damage)
-    if (defender->getAbility() == "Coup de grace" || defender->getAbility() == "Coup de grâce") {
+    if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != defender->getOwner()) && (defender->getAbility() == "Coup de grace" || defender->getAbility() == "Coup de grâce")) {
         if (damage == 1) {
             AbilityController::printAbilityTrigger(defender);
             std::cout << "-> Les Lémures ignorent l'attaque de 1 dégât !\n";
@@ -411,7 +449,8 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
             defender->takeDamage(damage);
 
             // Gladiator Check: Emperor's Grace
-            if (defender->getCurrentHP() <= 0 && !defender->getEmperorsGraceUsed() &&
+            if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != defender->getOwner()) &&
+                defender->getCurrentHP() <= 0 && !defender->getEmperorsGraceUsed() &&
                 (defender->getAbility() == "Emperor's Grace" || defender->getAbility() == "Grâce de l'Empereur")) {
 
                 AbilityController::printAbilityTrigger(defender);
@@ -441,7 +480,8 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
 
 
         // Ceryneian Hind Elusiveness Check
-        if (defender->isAlive() && (defender->getAbility() == "Elusive" || defender->getAbility() == "Insaisissable")) {
+        if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != defender->getOwner()) &&
+            defender->isAlive() && (defender->getAbility() == "Elusive" || defender->getAbility() == "Insaisissable")) {
             Language prevLang = Fidele::currentLanguage;
             Fidele::currentLanguage = Language::French;
             std::cout << "\n>>> POUVOIR ACTIVÉ : " << defender->getName() << " - " << defender->getAbility() << " <<<\n";
@@ -466,7 +506,8 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
         }
 
         // Chimera Deflagration Check
-        if (attacker->getAbility() == "Deflagration" || attacker->getAbility() == "Déflagration") {
+        if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != attacker->getOwner()) &&
+            (attacker->getAbility() == "Deflagration" || attacker->getAbility() == "Déflagration")) {
             Language prevLang = Fidele::currentLanguage;
             Fidele::currentLanguage = Language::French;
             std::cout << "\n>>> POUVOIR ACTIVÉ : " << attacker->getName() << " - " << attacker->getAbility() << " <<<\n";
@@ -510,14 +551,16 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
         std::cout << "L'attaque échoue ! " << defender->getName() << " bloque le coup sans subir de dégâts." << std::endl;
 
         // Morpheus Check: Sandman
-        if (defender->getAbility() == "Sandman" || defender->getAbility() == "Marchand de sable") {
+        if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != defender->getOwner()) &&
+            (defender->getAbility() == "Sandman" || defender->getAbility() == "Marchand de sable")) {
             AbilityController::printAbilityTrigger(defender);
             std::cout << "-> " << attacker->getName() << " s'endort !\n";
             attacker->setAsleep(true);
         }
 
         // Ceryneian Hind Elusiveness Check (still triggers if attack misses, as per "after being targeted")
-        if (defender->isAlive() && (defender->getAbility() == "Elusive" || defender->getAbility() == "Insaisissable")) {
+        if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != defender->getOwner()) &&
+            defender->isAlive() && (defender->getAbility() == "Elusive" || defender->getAbility() == "Insaisissable")) {
             Language prevLang = Fidele::currentLanguage;
             Fidele::currentLanguage = Language::French;
             std::cout << "\n>>> POUVOIR ACTIVÉ : " << defender->getName() << " - " << defender->getAbility() << " <<<\n";
@@ -580,8 +623,32 @@ void Board::attackDomaine(Fidele* attacker, Domaine* targetDomaine) {
         return;
     }
 
+    for (Domaine* d : turnMods.minervaImmuneDomaines) {
+        if (d == targetDomaine) {
+            std::cout << "-> Le domaine est protégé par l'Égide de Minerve et ne peut être endommagé !\n";
+            return;
+        }
+    }
+
     int attackRoll = rollDice();
-    int totalAttack = attackRoll + attacker->getAttackBonus();
+
+    if (turnMods.vulcanDoubleDice && turnMods.activeGodPlayer == attacker->getOwner()) {
+        int roll2 = rollDice();
+        attackRoll = std::max(attackRoll, roll2);
+        std::cout << "-> Vulcain offre un 2e jet d'attaque ! (" << attackRoll << " retenu)\n";
+    }
+
+    int additionalAttackBonus = 0;
+    if (!(turnMods.neptuneNullifyEnemyAbilities && turnMods.activeGodPlayer != attacker->getOwner())) {
+        attacker->applyOffensiveAbility(nullptr, additionalAttackBonus);
+    }
+
+    int totalAttack = attackRoll + attacker->getAttackBonus() + additionalAttackBonus;
+
+    if (turnMods.aresDoubleDamage && turnMods.activeGodPlayer == attacker->getOwner()) {
+        totalAttack *= 2;
+        std::cout << "-> Arès double les dégâts infligés au domaine (" << totalAttack << ") !\n";
+    }
 
     std::string domainName = (targetDomaine->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
 

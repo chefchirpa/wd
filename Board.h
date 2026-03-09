@@ -36,6 +36,9 @@ public:
     // Helper to check standard combat range
     bool isInRange(Position p1, Position p2, int range) const;
 
+    // Turn Modifiers state
+    TurnModifiers turnMods;
+
     // Combat logic
     void attackFidele(Fidele* attacker, Fidele* defender);
     void attackDomaine(Fidele* attacker, Domaine* targetDomaine);
@@ -69,6 +72,9 @@ public:
 
     // Remove a Fidele strictly from the board grid (used to bypass initial placement issues when forcing positions)
     void removeFideleFromGrid(Fidele* fidele);
+
+    // Reset TurnModifiers and restore states (like Dionysus ownership)
+    void resetTurnModifiers();
 
 private:
     Domaine domaine1;
