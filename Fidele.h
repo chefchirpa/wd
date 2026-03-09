@@ -42,7 +42,10 @@ public:
         if (currentHp < 0) currentHp = 0;
     }
     void setHP(int hp) { currentHp = hp; }
-    void resetHP() { currentHp = hp; }
+    void resetHP() {
+        currentHp = hp;
+        emperorsGraceUsed = false;
+    }
 
     int getRange() const { return range; }
     Movement getMovement() const { return movement; }
@@ -81,6 +84,9 @@ public:
     bool getIsAsleep() const { return isAsleep; }
     void setAsleep(bool asleep) { isAsleep = asleep; }
 
+    bool getEmperorsGraceUsed() const { return emperorsGraceUsed; }
+    void setEmperorsGraceUsed(bool used) { emperorsGraceUsed = used; }
+
     bool isImmuneToAbilities() const { return (abilityEn == "Cuirassier" || abilityFr == "Cuirassier"); }
 
     Position getPosition() const { return currentPosition; }
@@ -117,4 +123,5 @@ public:
     Position deathPosition;
     bool skipNextAttack = false;
     bool isAsleep = false;
+    bool emperorsGraceUsed = false;
 };

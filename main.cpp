@@ -864,6 +864,102 @@ int main(int argc, char* argv[]) {
         std::cout << "mAtt asleep? " << (mAtt.getIsAsleep() ? "Yes" : "No") << "\n";
     }
 
+    // --- Testing Roman Final 10 Abilities ---
+    std::cout << "\n--- Testing Roman Final 10 Abilities ---\n";
+    board = Board(); // Reset
+
+    Fidele* aquilon = nullptr; Fidele* cupid = nullptr; Fidele* proserpina = nullptr;
+    Fidele* horatii = nullptr; Fidele* rr = nullptr; Fidele* aeneas = nullptr;
+    Fidele* gladiator = nullptr; Fidele* rSoldier = nullptr; Fidele* hercules = nullptr;
+    Fidele* strix = nullptr;
+
+    for (auto& f : fideles) {
+        if (f.getName() == "Aquilon") aquilon = &f;
+        if (f.getName() == "Cupidon" || f.getName() == "Cupid") cupid = &f;
+        if (f.getName() == "Proserpine" || f.getName() == "Proserpina") proserpina = &f;
+        if (f.getName() == "Horaces" || f.getName() == "Horatii") horatii = &f;
+        if (f.getName() == "Romulus & Rémus" || f.getName() == "Romulus & Remus") rr = &f;
+        if (f.getName() == "Enée" || f.getName() == "Aeneas") aeneas = &f;
+        if (f.getName() == "Gladiateur" || f.getName() == "Gladiator") gladiator = &f;
+        if (f.getName() == "Soldat romain" || f.getName() == "Roman soldier") rSoldier = &f;
+        if (f.getName() == "Hercule" || f.getName() == "Hercules") hercules = &f;
+        if (f.getName() == "Stryge" || f.getName() == "Strix") strix = &f;
+    }
+
+    if (aquilon && cupid && proserpina && horatii && rr && aeneas && gladiator && rSoldier && hercules && strix) {
+        // 1. Aquilon - Tornado
+        aquilon->setOwner(Player::Player2); board.placeFidele(aquilon, {8, 4});
+        Fidele aqTarget = fideles[0]; aqTarget.setOwner(Player::Player1); board.placeFidele(&aqTarget, {5, 4});
+        std::cout << ">> Testing Aquilon (Tornado)\n";
+        AbilityController::useAquilonTornado(&board, aquilon, &aqTarget, "Up"); // Target pushed to 3,4
+
+        // 2. Cupid - Charm
+        cupid->setOwner(Player::Player2); board.placeFidele(cupid, {4, 4});
+        Fidele cpAtt = fideles[1]; cpAtt.setOwner(Player::Player1); board.placeFidele(&cpAtt, {3, 4});
+        std::cout << "\n>> Testing Cupidon (Charm - Passive)\n";
+        board.attackFidele(&cpAtt, cupid);
+
+        // 3. Proserpina - Queen of Hell
+        proserpina->setOwner(Player::Player2); board.placeFidele(proserpina, {5, 2});
+        Fidele pDead = fideles[2]; pDead.setOwner(Player::Player1); board.placeFidele(&pDead, {1, 2}); board.killFidele(&pDead);
+        std::cout << "\n>> Testing Proserpine (Queen of Hell - Block Resurrection on Column)\n";
+        board.resurrectFidele(&pDead);
+
+        // 4. Horatii - Strategic Retreat
+        horatii->setOwner(Player::Player2); board.placeFidele(horatii, {7, 7});
+        Fidele hoTarget = fideles[3]; hoTarget.setOwner(Player::Player1); board.placeFidele(&hoTarget, {6, 7});
+        std::cout << "\n>> Testing Horaces (Strategic Retreat)\n";
+        board.attackFidele(horatii, &hoTarget); // Triggers free move down
+
+        // 5. Romulus & Remus - Fortification
+        rr->setOwner(Player::Player2); board.placeFidele(rr, {1, 1}); // Tile 0 (0-2 x 0-2)
+        Fidele rrMover = fideles[4]; rrMover.setOwner(Player::Player1); board.placeFidele(&rrMover, {0, 3});
+        std::cout << "\n>> Testing Romulus & Rémus (Fortification Tile Block)\n";
+        board.moveUnit(&rrMover, "Right", 1); // Towards 0,2 (Tile 0) -> Blocked
+
+        // 6. Aeneas - Guardian
+        aeneas->setOwner(Player::Player2); board.placeFidele(aeneas, {10, 8});
+        Fidele aeAlly = fideles[5]; aeAlly.setOwner(Player::Player2); board.placeFidele(&aeAlly, {11, 8});
+        Fidele aeEnemy = fideles[6]; aeEnemy.setOwner(Player::Player1); board.placeFidele(&aeEnemy, {9, 8});
+        std::cout << "\n>> Testing Enée (Guardian Aura)\n";
+        board.attackFidele(&aeEnemy, &aeAlly); // Blocked
+
+        // 7. Gladiator - Emperor's Grace
+        gladiator->setOwner(Player::Player2); board.placeFidele(gladiator, {5, 5});
+        gladiator->setHP(1); // Set to 1 so hit is lethal
+        Fidele glAtt = fideles[7]; glAtt.setOwner(Player::Player1); board.placeFidele(&glAtt, {4, 5});
+        std::cout << "\n>> Testing Gladiateur (Emperor's Grace)\n";
+        board.attackFidele(&glAtt, gladiator); // Survives at 1 HP
+
+        // 8. Roman Soldier - Imperial Sword
+        rSoldier->setOwner(Player::Player2); board.placeFidele(rSoldier, {2, 5});
+        Fidele rsEnemy = fideles[8]; rsEnemy.setOwner(Player::Player1); board.placeFidele(&rsEnemy, {3, 6}); // Diagonal
+        std::cout << "\n>> Testing Soldat romain (Imperial Sword Diagonal)\n";
+        board.attackFidele(rSoldier, &rsEnemy);
+
+        // 9. Hercules - Overpower
+        hercules->setOwner(Player::Player2); board.placeFidele(hercules, {8, 1});
+        Fidele hcEnemy = fideles[9]; hcEnemy.setOwner(Player::Player1); board.placeFidele(&hcEnemy, {7, 1});
+        std::cout << "\n>> Testing Hercule (Overpower Double Roll)\n";
+        board.attackFidele(hercules, &hcEnemy);
+
+        // 10. Strix - Necrophagy
+        strix->setOwner(Player::Player2); board.placeFidele(strix, {6, 1});
+        strix->setHP(strix->getHP() - 1); // Damage it to allow healing
+        Fidele stDead = fideles[10]; stDead.setOwner(Player::Player1); board.placeFidele(&stDead, {5, 1}); board.killFidele(&stDead);
+        std::cout << "\n>> Testing Stryge (Necrophagy)\n";
+        // Strix is P2. P2 faces up (-x). So 'Up' is -1x. Strix moves to 5,1 (which is occupied by the dead body! Invalid move).
+        // Let's move Strix 'Right' (+y) to 6,2 instead, which is adjacent to the dead body at 5,1.
+        board.moveUnit(strix, "Right", 1); // Moves to 6,2. Adjacents: 7,2, 5,2, 6,3, 6,1. Still not adjacent to 5,1.
+
+        // Let's fix the test logic. Move Strix Left to 6,0. Adjacents: 5,0, 7,0, 6,1. Wait, dead body is at 5,1.
+        // Let's just move Strix from 7,1 to 6,1.
+        board.removeFideleFromGrid(strix);
+        board.placeFidele(strix, {7, 1});
+        std::cout << "Command: Move Strix Up 1 (to 6,1, adjacent to corpse at 5,1)\n";
+        board.moveUnit(strix, "Up", 1);
+    }
+
     // --- Testing PLAY_GOD command ---
     std::cout << "\n--- Testing PLAY_GOD command ---\n";
 

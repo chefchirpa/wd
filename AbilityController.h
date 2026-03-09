@@ -16,6 +16,7 @@ public:
     static void useAmphisbaenaAttack(Board* board, Fidele* amphisbaena, Fidele* target1, Fidele* target2);
     static bool useParcaeThreadOfLife(Board* board, Fidele* parcae, Fidele* deadAlly);
     static bool useCaladriusBloodDonation(Fidele* caladrius, Fidele* allyTarget);
+    static bool useAquilonTornado(Board* board, Fidele* aquilon, Fidele* target, const std::string& direction);
 
     // Post-Move Interrupts
     static void handlePostMoveInterrupts(Board* board, Fidele* movedUnit);

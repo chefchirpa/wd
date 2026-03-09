@@ -14,11 +14,13 @@ bool AbilityController::isProtectedByHector(Board* board, Fidele* target) {
     if (target && (target->getAbility() == "Cuirassier" || target->getAbility() == "Cuirassier")) return false; // Giant immune to abilities
     if (!target || !target->isAlive()) return false;
 
-    // Scan for Hector
+    // Scan for Hector & Aeneas
     for (int i = 0; i < board->LENGTH; ++i) {
         for (int j = 0; j < board->WIDTH; ++j) {
             Fidele* occ = board->getFideleAt({i, j});
             if (occ && occ->isAlive() && occ->getOwner() == target->getOwner() && occ != target) {
+
+                // Hector
                 if (occ->getAbility() == "Human shield" || occ->getAbility() == "Bouclier humain") {
                     // Check cross-shape distance <= 2
                     Position hPos = occ->getPosition();
@@ -29,6 +31,15 @@ bool AbilityController::isProtectedByHector(Board* board, Fidele* target) {
 
                         printAbilityTrigger(occ);
                         std::cout << "-> " << target->getName() << " est protégé par Hector et ne peut pas être attaqué !\n\n";
+                        return true;
+                    }
+                }
+
+                // Aeneas: Guardian (Same tile)
+                if (occ->getAbility() == "Guardian" || occ->getAbility() == "Protecteur") {
+                    if (board->isSameTile(occ->getPosition(), target->getPosition())) {
+                        printAbilityTrigger(occ);
+                        std::cout << "-> " << target->getName() << " est protégé par la tuile sanctifiée d'Enée et ne peut pas être attaqué !\n\n";
                         return true;
                     }
                 }
@@ -197,8 +208,68 @@ bool AbilityController::useCaladriusBloodDonation(Fidele* caladrius, Fidele* all
     return false;
 }
 
+bool AbilityController::useAquilonTornado(Board* board, Fidele* aquilon, Fidele* target, const std::string& direction) {
+    if (!aquilon || !target || !aquilon->isAlive() || !target->isAlive()) return false;
+
+    // Target must be on same row or column
+    if (aquilon->getPosition().x != target->getPosition().x && aquilon->getPosition().y != target->getPosition().y) return false;
+
+    printAbilityTrigger(aquilon);
+
+    // We use the basic raw movement for the push to ensure it doesn't count as standard 'moves' with stat limits
+    // but we can utilize a loop to move it 2 squares safely if not blocked.
+    // Note: The prompt says "bypasses any movement-restricting abilities" so we just calculate final dest and place it if free.
+    Position tPos = target->getPosition();
+    int dist = 2; // Move 2 squares further
+    Position nPos = tPos;
+
+    Player pov = aquilon->getOwner(); // Calculate direction relative to Aquilon's perspective
+    if (pov == Player::Player1) {
+        if (direction == "Up") nPos.x += dist;
+        else if (direction == "Down") nPos.x -= dist;
+        else if (direction == "Left") nPos.y -= dist;
+        else if (direction == "Right") nPos.y += dist;
+    } else {
+        if (direction == "Up") nPos.x -= dist;
+        else if (direction == "Down") nPos.x += dist;
+        else if (direction == "Left") nPos.y += dist;
+        else if (direction == "Right") nPos.y -= dist;
+    }
+
+    if (!board->isOccupied(nPos) && nPos.x >= 0 && nPos.x < board->LENGTH && nPos.y >= 0 && nPos.y < board->WIDTH) {
+        board->removeFideleFromGrid(target);
+        board->placeFidele(target, nPos);
+        std::cout << "-> " << target->getName() << " est emporté par la tornade jusqu'en (" << nPos.x << "," << nPos.y << ") !\n";
+        return true;
+    } else {
+        std::cout << "-> La tornade échoue car la case d'atterrissage est bloquée ou hors limites.\n";
+        return false;
+    }
+}
+
 void AbilityController::handlePostMoveInterrupts(Board* board, Fidele* movedUnit) {
     if (!movedUnit || !movedUnit->isAlive()) return;
+
+    // Strix: Necrophagy
+    if (movedUnit->getAbility() == "Necrophagy" || movedUnit->getAbility() == "Nécrophagie") {
+        if (movedUnit->getCurrentHP() < movedUnit->getHP()) {
+            // Check adjacents for dead tokens (f == nullptr is empty, !f->isAlive() is dead)
+            Position mPos = movedUnit->getPosition();
+            Position adj[4] = { {mPos.x+1, mPos.y}, {mPos.x-1, mPos.y}, {mPos.x, mPos.y+1}, {mPos.x, mPos.y-1} };
+            for (int d = 0; d < 4; ++d) {
+                // Must ensure we only query inside valid bounds to check for a token
+                if (adj[d].x >= 0 && adj[d].x < board->LENGTH && adj[d].y >= 0 && adj[d].y < board->WIDTH) {
+                    Fidele* c = board->getFideleAt(adj[d]);
+                    if (c && !c->isAlive()) {
+                        printAbilityTrigger(movedUnit);
+                        movedUnit->setHP(std::min(movedUnit->getHP(), movedUnit->getCurrentHP() + 1));
+                        std::cout << "-> " << movedUnit->getName() << " dévore une carcasse adjacente et regagne 1 PV (PV actuels: " << movedUnit->getCurrentHP() << ") !\n";
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
     for (int i = 0; i < board->LENGTH; ++i) {
         for (int j = 0; j < board->WIDTH; ++j) {

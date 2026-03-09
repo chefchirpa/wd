@@ -156,6 +156,19 @@ bool Board::isValidMove(Fidele* fidele, const std::vector<Position>& path) const
         return false;
     }
 
+    // Scan for Romulus & Remus fortification globally (since checking path requires tile logic)
+    std::vector<Position> fortificationTiles;
+    for (int i = 0; i < LENGTH; ++i) {
+        for (int j = 0; j < WIDTH; ++j) {
+            Fidele* occ = grid[i][j];
+            if (occ && occ->isAlive() && occ->getOwner() != fidele->getOwner()) {
+                if (occ->getAbility() == "Fortification" || occ->getAbility() == "Muraille") {
+                    fortificationTiles.push_back(occ->getPosition());
+                }
+            }
+        }
+    }
+
     Movement moveStats = fidele->getMovement();
     int forwardMoved = 0;
     int backwardMoved = 0;
@@ -173,6 +186,14 @@ bool Board::isValidMove(Fidele* fidele, const std::vector<Position>& path) const
         // Ensure moving exactly one square orthogonally per step in the path
         if (std::abs(dx) + std::abs(dy) != 1) {
             return false; // Diagonal or jumping
+        }
+
+        // Romulus & Remus: check if nextPos enters their tile
+        for (auto& rPos : fortificationTiles) {
+            if (isSameTile(nextPos, rPos)) {
+                std::cout << "Action impossible : la Muraille de Romulus & Rémus bloque l'accès à cette tuile.\n";
+                return false;
+            }
         }
 
         // Cannot pass over a living enemy Fidele
@@ -276,6 +297,13 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     } else {
         if (attacker->getAbility() == "Archery" || attacker->getAbility() == "Tir à l'arc") {
             attackInRange = isAmazonTargetingValid(attacker->getPosition(), defender->getPosition());
+        } else if (attacker->getAbility() == "Imperial sword" || attacker->getAbility() == "Glaive impérial") {
+            // Roman Soldier: Can attack diagonally (Distance = 1)
+            int dx = std::abs(attacker->getPosition().x - defender->getPosition().x);
+            int dy = std::abs(attacker->getPosition().y - defender->getPosition().y);
+            if ((dx == 1 && dy == 1) || (dx + dy == 1)) {
+                attackInRange = true;
+            }
         } else {
             attackInRange = isInRange(attacker->getPosition(), defender->getPosition(), attacker->getRange());
         }
@@ -287,6 +315,13 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     }
 
     int attackRoll = rollDice();
+    if (attacker->getAbility() == "Overpower" || attacker->getAbility() == "Surpuissance") {
+        int roll2 = rollDice();
+        attackRoll = std::max(attackRoll, roll2);
+        AbilityController::printAbilityTrigger(attacker);
+        std::cout << "-> Hercule garde le meilleur jet : " << attackRoll << " !\n";
+    }
+
     int defenseRoll = rollDice();
 
     int additionalAttackBonus = 0;
@@ -307,6 +342,20 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
 
     int totalAttack = attackRoll + oppAtkBonus + additionalAttackBonus;
     int totalDefense = defenseRoll + oppDefBonus + additionalDefenseBonus;
+
+    // Cupid Check: Charm (-1 to opponent's die result, simulated by deducting 1 from total before damage if possible, or modifying raw stat)
+    if (attacker->getAbility() == "Charm" || attacker->getAbility() == "Charme") {
+        totalDefense -= 1;
+        if (totalDefense < 0) totalDefense = 0;
+        AbilityController::printAbilityTrigger(attacker);
+        std::cout << "-> Charme actif : Défense réduite à " << totalDefense << " !\n";
+    }
+    if (defender->getAbility() == "Charm" || defender->getAbility() == "Charme") {
+        totalAttack -= 1;
+        if (totalAttack < 0) totalAttack = 0;
+        AbilityController::printAbilityTrigger(defender);
+        std::cout << "-> Charme actif : Attaque réduite à " << totalAttack << " !\n";
+    }
 
     int damage = totalAttack - totalDefense;
     if (damage < 0) damage = 0;
@@ -358,7 +407,19 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
                 }
             }
         } else {
+            int preHitHp = defender->getCurrentHP();
             defender->takeDamage(damage);
+
+            // Gladiator Check: Emperor's Grace
+            if (defender->getCurrentHP() <= 0 && !defender->getEmperorsGraceUsed() &&
+                (defender->getAbility() == "Emperor's Grace" || defender->getAbility() == "Grâce de l'Empereur")) {
+
+                AbilityController::printAbilityTrigger(defender);
+                std::cout << "-> Le Gladiateur survit miraculeusement avec 1 PV !\n";
+                defender->setHP(1);
+                defender->setEmperorsGraceUsed(true);
+            }
+
             std::cout << "Dégâts infligés : " << damage << ". PV restants du défenseur : " << defender->getCurrentHP() << "." << std::endl;
 
             if (defender->getCurrentHP() <= 0) {
@@ -475,6 +536,23 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
             } else {
                 std::cout << "-> La fuite a échoué (chemin bloqué).\n\n";
             }
+        }
+    }
+
+    if (damage > 0 && attacker->isAlive() && (attacker->getAbility() == "Strategic retreat" || attacker->getAbility() == "Repli stratégique")) {
+        AbilityController::printAbilityTrigger(attacker);
+        std::cout << "-> Action accordée : Repli stratégique gratuit pour " << attacker->getName() << " !\n";
+
+        std::string retreatDir = (attacker->getOwner() == Player::Player1) ? "Down" : "Up";
+        std::cout << "[PROMPT] Entrez la direction de fuite (Up, Down, Left, Right) et la distance : " << retreatDir << " 1 (Simulé)\n";
+        bool retreatSuccess = moveUnit(attacker, retreatDir, 1);
+        if (!retreatSuccess) {
+            retreatSuccess = moveUnit(attacker, "Right", 1);
+        }
+        if (retreatSuccess) {
+            std::cout << "-> " << attacker->getName() << " s'est replié vers la case (" << attacker->getPosition().x << "," << attacker->getPosition().y << ") !\n\n";
+        } else {
+            std::cout << "-> Le repli a échoué (chemin bloqué).\n\n";
         }
     }
 }
@@ -690,19 +768,26 @@ bool Board::resurrectFidele(Fidele* fidele) {
 
     Position deathPos = fidele->getDeathPosition();
 
-    // Cerberus check: "Gardien des enfers"
+    // Blockers check: Cerberus & Proserpina
     for (int i = 0; i < LENGTH; ++i) {
         for (int j = 0; j < WIDTH; ++j) {
             Fidele* occ = grid[i][j];
             if (occ && occ->isAlive() && occ->getOwner() != fidele->getOwner()) {
+
+                // Cerberus
                 if (occ->getAbility() == "Guardian of the underworld" || occ->getAbility() == "Gardien des enfers") {
                     if (isSameTile(occ->getPosition(), deathPos)) {
-                        Language prevLang = Fidele::currentLanguage;
-                        Fidele::currentLanguage = Language::French;
-                        std::cout << "\n>>> POUVOIR ACTIVÉ : " << occ->getName() << " - " << occ->getAbility() << " <<<\n";
-                        std::cout << "Effet : " << occ->getDescription() << "\n";
+                        AbilityController::printAbilityTrigger(occ);
                         std::cout << "-> Résurrection de " << fidele->getName() << " annulée !\n\n";
-                        Fidele::currentLanguage = prevLang;
+                        return false;
+                    }
+                }
+
+                // Proserpina
+                if (occ->getAbility() == "Queen of Hell" || occ->getAbility() == "Reine des enfers") {
+                    if (occ->getPosition().y == deathPos.y) {
+                        AbilityController::printAbilityTrigger(occ);
+                        std::cout << "-> Proserpine bloque la résurrection de " << fidele->getName() << " sur cette colonne !\n\n";
                         return false;
                     }
                 }
