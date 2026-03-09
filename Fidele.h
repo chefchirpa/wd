@@ -41,6 +41,7 @@ public:
         currentHp -= amount;
         if (currentHp < 0) currentHp = 0;
     }
+    void setHP(int hp) { currentHp = hp; }
     void resetHP() { currentHp = hp; }
 
     int getRange() const { return range; }
@@ -77,6 +78,11 @@ public:
     bool getSkipNextAttack() const { return skipNextAttack; }
     void setSkipNextAttack(bool skip) { skipNextAttack = skip; }
 
+    bool getIsAsleep() const { return isAsleep; }
+    void setAsleep(bool asleep) { isAsleep = asleep; }
+
+    bool isImmuneToAbilities() const { return (abilityEn == "Cuirassier" || abilityFr == "Cuirassier"); }
+
     Position getPosition() const { return currentPosition; }
     void setPosition(Position pos) { currentPosition = pos; }
 
@@ -110,4 +116,5 @@ public:
     Position currentPosition;
     Position deathPosition;
     bool skipNextAttack = false;
+    bool isAsleep = false;
 };

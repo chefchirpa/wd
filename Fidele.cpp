@@ -67,9 +67,6 @@ void Fidele::applyOffensiveAbility(Fidele* target, int& additionalAttackBonus) c
 
         // Target must be on the same column (y matches)
         if (myPos.y == targetPos.y) {
-            // Target must be directly "in front".
-            // Player 1 (Olympe) starts at top (x=0) and faces down (+x).
-            // Player 2 (Pantheon) starts at bottom (x=11) and faces up (-x).
             bool inFront = false;
             if (this->getOwner() == Player::Player1 && targetPos.x > myPos.x) {
                 inFront = true;
@@ -78,6 +75,11 @@ void Fidele::applyOffensiveAbility(Fidele* target, int& additionalAttackBonus) c
             }
 
             if (inFront) {
+                // If it's the Roman Cyclops, the ability is a multi-target AOE, so the +1 bonus logic from Greek Cyclops might differ,
+                // but the prompt mentions "Cyclops (Roman) - Eye: If multiple enemies are in the same vertical column... his attack hits ALL of them".
+                // Since this function applies per target, we can keep the +1 for the Greek version.
+                // The actual multi-target hit for Roman Cyclops will need to be handled in the main combat engine/controller loop.
+                // For safety and shared identity, we'll keep the +1 here.
                 additionalAttackBonus += 1;
 
                 // Display feedback in French as requested

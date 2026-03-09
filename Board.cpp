@@ -74,6 +74,11 @@ bool Board::moveUnit(Fidele* fidele, const std::string& direction, int distance)
         return false;
     }
 
+    if (fidele->getIsAsleep()) {
+        std::cout << "Action impossible : " << fidele->getName() << " est endormi(e) et passe son tour.\n";
+        return false;
+    }
+
     std::vector<Position> path;
     Position currentPos = fidele->getPosition();
     Player owner = fidele->getOwner();
@@ -255,18 +260,28 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
         return;
     }
 
+    if (attacker->getIsAsleep()) {
+        std::cout << attacker->getName() << " est endormi et ne peut pas attaquer.\n";
+        return;
+    }
+
     if (AbilityController::isProtectedByHector(this, defender)) {
         return; // Hector blocks the attack execution entirely
     }
 
-    bool inRange = false;
-    if (attacker->getAbility() == "Archery" || attacker->getAbility() == "Tir à l'arc") {
-        inRange = isAmazonTargetingValid(attacker->getPosition(), defender->getPosition());
+    bool attackInRange = false;
+    // Giant already handled above
+    if (defender->getAbility() == "Cuirassier") {
+        attackInRange = isInRange(attacker->getPosition(), defender->getPosition(), attacker->getRange());
     } else {
-        inRange = isInRange(attacker->getPosition(), defender->getPosition(), attacker->getRange());
+        if (attacker->getAbility() == "Archery" || attacker->getAbility() == "Tir à l'arc") {
+            attackInRange = isAmazonTargetingValid(attacker->getPosition(), defender->getPosition());
+        } else {
+            attackInRange = isInRange(attacker->getPosition(), defender->getPosition(), attacker->getRange());
+        }
     }
 
-    if (!inRange) {
+    if (!attackInRange) {
         std::cout << "L'attaque échoue : cible hors de portée." << std::endl;
         return;
     }
@@ -296,27 +311,73 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
     int damage = totalAttack - totalDefense;
     if (damage < 0) damage = 0;
 
+    // Lemures Check: Coup de grace (Immune to exactly 1 damage)
+    if (defender->getAbility() == "Coup de grace" || defender->getAbility() == "Coup de grâce") {
+        if (damage == 1) {
+            AbilityController::printAbilityTrigger(defender);
+            std::cout << "-> Les Lémures ignorent l'attaque de 1 dégât !\n";
+            damage = 0;
+        }
+    }
+
     std::cout << attacker->getName() << " lance l'assaut ! (Attaque totale: " << totalAttack << ", Défense totale: " << totalDefense << ")" << std::endl;
 
     if (damage > 0) {
-        defender->takeDamage(damage);
-        std::cout << "Dégâts infligés : " << damage << ". PV restants du défenseur : " << defender->getCurrentHP() << "." << std::endl;
+        // The Wolf Check: Mother instinct
+        Fidele* wolf = nullptr;
+        if (defender->getType() == FideleType::Heros) {
+            for (int i = 0; i < LENGTH; ++i) {
+                for (int j = 0; j < WIDTH; ++j) {
+                    Fidele* occ = grid[i][j];
+                    if (occ && occ->isAlive() && occ->getOwner() == defender->getOwner() &&
+                        (occ->getAbility() == "Mother instinct" || occ->getAbility() == "Instinct maternel")) {
+                        wolf = occ;
+                        break;
+                    }
+                }
+                if (wolf) break;
+            }
+        }
 
-        if (defender->getCurrentHP() <= 0) {
-            killFidele(defender);
-            Domaine* defenderDomaine = getDomaine(defender->getOwner());
-            std::string domainName = (defender->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+        if (wolf) {
+            AbilityController::printAbilityTrigger(wolf);
+            std::cout << "[PROMPT] La Louve veut prendre les dégâts à la place de " << defender->getName() << ". (O/N) : O (Simulé)\n";
+            wolf->takeDamage(damage);
+            std::cout << "Dégâts infligés à La Louve : " << damage << ". PV restants : " << wolf->getCurrentHP() << ".\n";
 
-            std::cout << defender->getName() << " est tombé au combat ! Le domaine " << domainName << " perd 1 PV." << std::endl;
+            if (wolf->getCurrentHP() <= 0) {
+                killFidele(wolf);
+                Domaine* wolfDom = getDomaine(wolf->getOwner());
+                std::string domainName = (wolf->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+                std::cout << wolf->getName() << " est tombé au combat ! Le domaine " << domainName << " perd 1 PV." << std::endl;
+                if (wolfDom) {
+                    wolfDom->takeDamage(1);
+                    if (wolfDom->getHP() <= 0) {
+                        std::cout << "\n*** VICTOIRE ! ***\nLe domaine " << domainName << " a été détruit. Fin de la guerre !\n";
+                    }
+                }
+            }
+        } else {
+            defender->takeDamage(damage);
+            std::cout << "Dégâts infligés : " << damage << ". PV restants du défenseur : " << defender->getCurrentHP() << "." << std::endl;
 
-            if (defenderDomaine) {
-                defenderDomaine->takeDamage(1);
-                if (defenderDomaine->getHP() <= 0) {
-                    std::cout << "\n*** VICTOIRE ! ***\n";
-                    std::cout << "Le domaine " << domainName << " a été détruit. Fin de la guerre !" << std::endl;
+            if (defender->getCurrentHP() <= 0) {
+                killFidele(defender);
+                Domaine* defenderDomaine = getDomaine(defender->getOwner());
+                std::string domainName = (defender->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+
+                std::cout << defender->getName() << " est tombé au combat ! Le domaine " << domainName << " perd 1 PV." << std::endl;
+
+                if (defenderDomaine) {
+                    defenderDomaine->takeDamage(1);
+                    if (defenderDomaine->getHP() <= 0) {
+                        std::cout << "\n*** VICTOIRE ! ***\n";
+                        std::cout << "Le domaine " << domainName << " a été détruit. Fin de la guerre !" << std::endl;
+                    }
                 }
             }
         }
+
 
         // Ceryneian Hind Elusiveness Check
         if (defender->isAlive() && (defender->getAbility() == "Elusive" || defender->getAbility() == "Insaisissable")) {
@@ -359,18 +420,22 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
                     Fidele* occ = grid[i][j];
                     if (occ && occ->isAlive() && occ != defender && occ->getOwner() == defender->getOwner()) {
                         if (isSameTile(occ->getPosition(), targetPos)) {
-                            std::cout << "-> " << occ->getName() << " subit 1 dégât de brûlure !\n";
-                            occ->takeDamage(1);
+                            if (occ->isImmuneToAbilities()) {
+                                std::cout << "-> " << occ->getName() << " est immunisé contre les capacités spéciales (Cuirassier) et ignore les brûlures !\n";
+                            } else {
+                                std::cout << "-> " << occ->getName() << " subit 1 dégât de brûlure !\n";
+                                occ->takeDamage(1);
 
-                            if (occ->getCurrentHP() <= 0) {
-                                killFidele(occ);
-                                std::string dName = (occ->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
-                                std::cout << "-> " << occ->getName() << " a succombé aux brûlures ! Le domaine " << dName << " perd 1 PV.\n";
-                                Domaine* dom = getDomaine(occ->getOwner());
-                                if (dom) {
-                                    dom->takeDamage(1);
-                                    if (dom->getHP() <= 0) {
-                                        std::cout << "\n*** VICTOIRE ! ***\nLe domaine " << dName << " a été détruit. Fin de la guerre !\n";
+                                if (occ->getCurrentHP() <= 0) {
+                                    killFidele(occ);
+                                    std::string dName = (occ->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+                                    std::cout << "-> " << occ->getName() << " a succombé aux brûlures ! Le domaine " << dName << " perd 1 PV.\n";
+                                    Domaine* dom = getDomaine(occ->getOwner());
+                                    if (dom) {
+                                        dom->takeDamage(1);
+                                        if (dom->getHP() <= 0) {
+                                            std::cout << "\n*** VICTOIRE ! ***\nLe domaine " << dName << " a été détruit. Fin de la guerre !\n";
+                                        }
                                     }
                                 }
                             }
@@ -382,6 +447,13 @@ void Board::attackFidele(Fidele* attacker, Fidele* defender) {
         }
     } else {
         std::cout << "L'attaque échoue ! " << defender->getName() << " bloque le coup sans subir de dégâts." << std::endl;
+
+        // Morpheus Check: Sandman
+        if (defender->getAbility() == "Sandman" || defender->getAbility() == "Marchand de sable") {
+            AbilityController::printAbilityTrigger(defender);
+            std::cout << "-> " << attacker->getName() << " s'endort !\n";
+            attacker->setAsleep(true);
+        }
 
         // Ceryneian Hind Elusiveness Check (still triggers if attack misses, as per "after being targeted")
         if (defender->isAlive() && (defender->getAbility() == "Elusive" || defender->getAbility() == "Insaisissable")) {
@@ -451,6 +523,11 @@ void Board::useMermaidSong(Fidele* mermaid, Fidele* target) {
     if (!mermaid || !target || !mermaid->isAlive() || !target->isAlive()) return;
     if (mermaid->getAbility() != "Song" && mermaid->getAbility() != "Chant") return;
 
+    if (target->isImmuneToAbilities()) {
+        std::cout << target->getName() << " (Géant) est immunisé contre le Chant de la Sirène.\n";
+        return;
+    }
+
     if (!isInRange(mermaid->getPosition(), target->getPosition(), mermaid->getRange())) {
         std::cout << "Le chant de la Sirène échoue : cible hors de portée." << std::endl;
         return;
@@ -505,6 +582,91 @@ void Board::useMermaidSong(Fidele* mermaid, Fidele* target) {
         }
     } else {
         std::cout << "-> L'attraction échoue car la case de destination est bloquée.\n";
+    }
+}
+
+void Board::executeCyclopsAoEAttack(Fidele* cyclope) {
+    if (!cyclope || !cyclope->isAlive()) return;
+
+    // Find all valid targets in the same column strictly in front of the Cyclops within his Range
+    std::vector<Fidele*> targets;
+    Position cPos = cyclope->getPosition();
+    Player owner = cyclope->getOwner();
+    int range = cyclope->getRange();
+
+    for (int i = 1; i <= range; ++i) {
+        Position checkPos = cPos;
+        if (owner == Player::Player1) {
+            checkPos.x += i;
+        } else if (owner == Player::Player2) {
+            checkPos.x -= i;
+        }
+
+        if (isWithinBounds(checkPos)) {
+            Fidele* occ = grid[checkPos.x][checkPos.y];
+            if (occ && occ->isAlive() && occ->getOwner() != owner) {
+                targets.push_back(occ);
+            }
+        }
+    }
+
+    if (targets.empty()) {
+        std::cout << "Aucune cible dans la ligne de mire du Cyclope." << std::endl;
+        return;
+    }
+
+    Language prevLang = Fidele::currentLanguage;
+    Fidele::currentLanguage = Language::French;
+    std::cout << "\n>>> POUVOIR ACTIVÉ : " << cyclope->getName() << " - " << cyclope->getAbility() << " <<<\n";
+    std::cout << "Effet : " << cyclope->getDescription() << "\n";
+    Fidele::currentLanguage = prevLang;
+
+    // Roll attack ONCE for the Cyclops
+    int attackRoll = rollDice();
+    int additionalAttackBonus = 0;
+    cyclope->applyOffensiveAbility(targets[0], additionalAttackBonus); // Just dummy check for the +1 if we kept it for Roman
+
+    int totalAttack = attackRoll + cyclope->getAttackBonus() + additionalAttackBonus;
+    std::cout << cyclope->getName() << " déclenche son Rayon Optique de zone ! (Attaque globale: " << totalAttack << ")\n";
+
+    // Resolve against all targets
+    for (Fidele* target : targets) {
+        if (target->getAbility() == "Cuirassier") {
+            std::cout << "-> " << target->getName() << " (Géant) est immunisé contre le rayon optique !\n";
+            continue;
+        }
+
+        int defenseRoll = rollDice();
+        int additionalDefenseBonus = 0;
+        target->applyDefensiveAbility(this, cyclope, additionalDefenseBonus);
+
+        int oppDefBonus = target->getDefenseBonus();
+        int totalDefense = defenseRoll + oppDefBonus + additionalDefenseBonus;
+
+        int damage = totalAttack - totalDefense;
+        if (damage < 0) damage = 0;
+
+        std::cout << "-> Cible: " << target->getName() << " | Défense totale: " << totalDefense;
+
+        if (damage > 0) {
+            target->takeDamage(damage);
+            std::cout << " | Dégâts reçus : " << damage << ". PV restants : " << target->getCurrentHP() << ".\n";
+
+            if (target->getCurrentHP() <= 0) {
+                killFidele(target);
+                Domaine* defenderDomaine = getDomaine(target->getOwner());
+                std::string domainName = (target->getOwner() == Player::Player1) ? "Olympe" : "Panthéon";
+                std::cout << "   " << target->getName() << " a été pulvérisé ! Le domaine " << domainName << " perd 1 PV.\n";
+                if (defenderDomaine) {
+                    defenderDomaine->takeDamage(1);
+                    if (defenderDomaine->getHP() <= 0) {
+                        std::cout << "\n*** VICTOIRE ! ***\nLe domaine " << domainName << " a été détruit. Fin de la guerre !\n";
+                    }
+                }
+            }
+        } else {
+            std::cout << " | Bloqué ! Aucun dégât.\n";
+        }
     }
 }
 

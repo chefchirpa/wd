@@ -37,7 +37,10 @@ bool GodPowerManager::playGod(God* god, PlayerState& owner, Board& board, Player
             }
         }
 
-        if (target) {
+        if (target && target->isImmuneToAbilities()) {
+            std::cout << target->getName() << " (Géant) est immunisé contre les pouvoirs des Dieux !\n";
+            success = false;
+        } else if (target) {
             std::cout << "Zeus strikes " << target->getName() << " for 5 damage!\n";
             target->takeDamage(5);
             if (target->getCurrentHP() <= 0) {

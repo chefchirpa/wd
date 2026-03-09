@@ -707,6 +707,24 @@ int main(int argc, char* argv[]) {
         if (f.getName() == "Hector") hector = &f;
     }
 
+    // Find Roman Units
+    Fidele* celeris = nullptr; Fidele* amphi = nullptr; Fidele* lemures = nullptr;
+    Fidele* giant = nullptr; Fidele* romanCyclops = cyclopePtr; // Assume P2 Cyclops is Roman
+    Fidele* parcae = nullptr; Fidele* wolf = nullptr; Fidele* cubs = nullptr;
+    Fidele* caladrius = nullptr; Fidele* morpheus = nullptr;
+
+    for (auto& f : fideles) {
+        if (f.getName() == "Céléris" || f.getName() == "Celeris") celeris = &f;
+        if (f.getName() == "Amphisbène" || f.getName() == "Amphisbaena") amphi = &f;
+        if (f.getName() == "Lémures" || f.getName() == "Lemures") lemures = &f;
+        if (f.getName() == "Géant" || f.getName() == "Giant") giant = &f;
+        if (f.getName() == "Parques" || f.getName() == "Parcae") parcae = &f;
+        if (f.getName() == "La Louve" || f.getName() == "The Wolf") wolf = &f;
+        if (f.getName() == "Louveteaux" || f.getName() == "Cubs") cubs = &f;
+        if (f.getName() == "Caladrius") caladrius = &f;
+        if (f.getName() == "Morpheus") morpheus = &f;
+    }
+
     if (moirai && titan && charon && promethee && ulysse && thesee && heracles && amazone && hector) {
         // 1. Moirai Execution
         moirai->setOwner(Player::Player1); board.placeFidele(moirai, {0,0});
@@ -770,6 +788,80 @@ int main(int argc, char* argv[]) {
         Fidele hAttacker = fideles[9]; hAttacker.setOwner(Player::Player2); board.placeFidele(&hAttacker, {0,6});
         std::cout << "\n>> Testing Hector (Human Shield)\n";
         board.attackFidele(&hAttacker, &hProtect); // Should be blocked by Hector
+    }
+
+    // --- Testing Roman Advanced Abilities ---
+    std::cout << "\n--- Testing Roman Advanced Abilities ---\n";
+    if (celeris && amphi && lemures && giant && romanCyclops && parcae && wolf && cubs && caladrius && morpheus) {
+        board = Board(); // Reset
+
+        // 1. Celeris Air Support
+        celeris->setOwner(Player::Player2); board.placeFidele(celeris, {11, 4});
+        Fidele cAlly = fideles[0]; cAlly.setOwner(Player::Player2); board.placeFidele(&cAlly, {0, 0}); // Far away
+        std::cout << ">> Testing Celeris (Air Support)\n";
+        AbilityController::useCelerisAirSupport(&board, celeris, &cAlly); // Teleports cAlly to 10,4
+
+        // 2. Amphisbaena Two-headed Attack
+        amphi->setOwner(Player::Player2); board.placeFidele(amphi, {5, 5});
+        Fidele t1 = fideles[1]; t1.setOwner(Player::Player1); board.placeFidele(&t1, {4, 5});
+        Fidele t2 = fideles[2]; t2.setOwner(Player::Player1); board.placeFidele(&t2, {5, 6});
+        std::cout << "\n>> Testing Amphisbaena (Two-headed Attack)\n";
+        AbilityController::useAmphisbaenaAttack(&board, amphi, &t1, &t2);
+
+        // 3. Lemures Coup de Grace
+        lemures->setOwner(Player::Player2); board.placeFidele(lemures, {2, 2});
+        Fidele lAtt = fideles[3]; lAtt.setOwner(Player::Player1); board.placeFidele(&lAtt, {2, 3});
+        std::cout << "\n>> Testing Lemures (Immune to 1 damage)\n";
+        std::cout << "[Note: requires attack roll to naturally deal exactly 1 damage to see full block, logging will show Coup de grace if so]\n";
+        board.attackFidele(&lAtt, lemures);
+
+        // 4. Giant Cuirassier & 8. Cubs Predators
+        giant->setOwner(Player::Player2); board.placeFidele(giant, {1, 1});
+        cubs->setOwner(Player::Player2); board.placeFidele(cubs, {3, 3});
+        Fidele gAtt = fideles[4]; gAtt.setOwner(Player::Player1); board.placeFidele(&gAtt, {0, 1});
+        std::cout << "\n>> Testing Giant (Immune to Abilities) & Cubs (Interrupt)\n";
+        std::cout << "Command: Move P1 to (2,3) to trigger Cubs\n";
+        board.moveUnit(&gAtt, "Up", 2); // Moves to 2,1, passes Cubs at 3,3 ? Let's move exactly next to Cubs.
+        board.removeFideleFromGrid(&gAtt); board.placeFidele(&gAtt, {2,3});
+        board.moveUnit(&gAtt, "Right", 1); // Ends at 2,4, same tile as Cubs {3,3}, should trigger interrupt
+
+        // 5. Roman Cyclops AOE
+        romanCyclops->setOwner(Player::Player2); board.placeFidele(romanCyclops, {8, 8});
+        Fidele cy1 = fideles[5]; cy1.setOwner(Player::Player1); board.placeFidele(&cy1, {7, 8});
+        Fidele cy2 = fideles[6]; cy2.setOwner(Player::Player1); board.placeFidele(&cy2, {6, 8});
+        std::cout << "\n>> Testing Roman Cyclops (AOE Column)\n";
+        board.executeCyclopsAoEAttack(romanCyclops);
+
+        // 6. Parcae Thread of Life
+        parcae->setOwner(Player::Player2); board.placeFidele(parcae, {5, 0});
+        Fidele deadAlly = fideles[7]; deadAlly.setOwner(Player::Player2);
+        board.placeFidele(&deadAlly, {5, 1}); board.killFidele(&deadAlly); // Killed on same tile
+        std::cout << "\n>> Testing Parcae (Resurrect)\n";
+        AbilityController::useParcaeThreadOfLife(&board, parcae, &deadAlly);
+
+        // 7. The Wolf Mother Instinct
+        wolf->setOwner(Player::Player2); board.placeFidele(wolf, {9, 9});
+        Fidele romanHero = fideles[8]; romanHero.setOwner(Player::Player2);
+        // Force to Hero to trigger The Wolf
+        romanHero.setAbility("None", "None");
+        board.placeFidele(&romanHero, {4, 4});
+        Fidele p1Att = fideles[9]; p1Att.setOwner(Player::Player1); board.placeFidele(&p1Att, {3, 4});
+        std::cout << "\n>> Testing The Wolf (Mother Instinct)\n";
+        board.attackFidele(&p1Att, &romanHero); // Wolf should intercept
+
+        // 9. Caladrius Blood Donation
+        caladrius->setOwner(Player::Player2); board.placeFidele(caladrius, {8, 1});
+        Fidele bleedTarget = fideles[10]; bleedTarget.setOwner(Player::Player2); bleedTarget.takeDamage(2); board.placeFidele(&bleedTarget, {8, 2});
+        std::cout << "\n>> Testing Caladrius (Blood Donation)\n";
+        AbilityController::useCaladriusBloodDonation(caladrius, &bleedTarget);
+
+        // 10. Morpheus Sandman
+        morpheus->setOwner(Player::Player2); board.placeFidele(morpheus, {0, 0});
+        Fidele mAtt = fideles[11]; mAtt.setOwner(Player::Player1); board.placeFidele(&mAtt, {1, 0});
+        std::cout << "\n>> Testing Morpheus (Sandman)\n";
+        std::cout << "[Note: Requires Morpheus taking 0 damage. If so, mAtt falls asleep.]\n";
+        board.attackFidele(&mAtt, morpheus);
+        std::cout << "mAtt asleep? " << (mAtt.getIsAsleep() ? "Yes" : "No") << "\n";
     }
 
     // --- Testing PLAY_GOD command ---

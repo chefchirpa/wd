@@ -43,6 +43,9 @@ public:
     // Advanced Ability: Mermaid Song
     void useMermaidSong(Fidele* mermaid, Fidele* target);
 
+    // Advanced Ability: Cyclops (Roman) Column AOE Attack
+    void executeCyclopsAoEAttack(Fidele* cyclope);
+
     // Get Domain for player
     Domaine* getDomaine(Player player);
 
